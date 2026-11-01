@@ -33,7 +33,7 @@ function active(href: string, pathname: string) {
 }
 
 function Icon({ name }: { name: string }) {
-  const common = { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" } as const;
+  const common = { width: 28, height: 28, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" } as const;
   if (name === "grid") {
     return (
       <svg {...common}>
@@ -162,14 +162,14 @@ export function DeskFrame({ children, notices = [] }: { children: React.ReactNod
         <button type="button" className="fixed inset-0 z-40 bg-gray-900/50 lg:hidden" aria-label="Close menu" onClick={() => setOpen(false)} />
       ) : null}
       <aside
-        className={`fixed top-0 left-0 z-50 flex h-screen w-[290px] flex-col border-r border-gray-200 bg-white transition-all duration-300 ease-linear lg:translate-x-0 ${collapsed ? "lg:w-[90px]" : ""} ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed top-0 left-0 z-50 flex h-screen w-[320px] flex-col border-r border-gray-200 bg-white transition-all duration-300 ease-linear lg:translate-x-0 ${collapsed ? "lg:w-[104px]" : ""} ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className={`flex items-center px-5 py-8 ${collapsed ? "lg:justify-center lg:px-0" : ""}`}>
           <Link href="/" onClick={() => setOpen(false)} className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/magpie-logo-purple.png" alt="Magpie Studio" className={`h-8 w-auto ${collapsed ? "lg:hidden" : ""}`} />
+            <img src="/brand/magpie-logo-purple.png" alt="Magpie Studio" className={`h-24 w-auto ${collapsed ? "lg:hidden" : ""}`} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/magpie-mark.png" alt="" className={`hidden h-8 w-8 ${collapsed ? "lg:block" : ""}`} />
+            <img src="/brand/magpie-mark.png" alt="" className={`hidden h-12 w-12 ${collapsed ? "lg:block" : ""}`} />
           </Link>
         </div>
         <div className={`no-scrollbar flex flex-1 flex-col overflow-y-auto duration-300 ease-linear ${collapsed ? "px-5 lg:px-3" : "px-5"}`}>
@@ -178,7 +178,7 @@ export function DeskFrame({ children, notices = [] }: { children: React.ReactNod
               <span className={collapsed ? "lg:hidden" : ""}>Menu</span>
               {collapsed ? <span className="hidden lg:inline">•••</span> : null}
             </h2>
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-2">
               {links.map((link) => {
                 const on = active(link.href, pathname);
                 return (
@@ -202,7 +202,7 @@ export function DeskFrame({ children, notices = [] }: { children: React.ReactNod
         </div>
       </aside>
 
-      <div className={`transition-[padding] duration-300 ease-linear ${collapsed ? "lg:ps-[90px]" : "lg:ps-[290px]"}`}>
+      <div className={`transition-[padding] duration-300 ease-linear ${collapsed ? "lg:ps-[104px]" : "lg:ps-[320px]"}`}>
         <header className="sticky top-0 z-30 flex w-full bg-white lg:border-b lg:border-gray-200">
           <div className="flex grow flex-col items-center justify-between xl:flex-row xl:px-6">
             <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:gap-4 xl:justify-normal xl:border-b-0 xl:px-0 xl:py-4">
@@ -227,7 +227,7 @@ export function DeskFrame({ children, notices = [] }: { children: React.ReactNod
               </button>
               <Link href="/" className="xl:hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/magpie-logo-purple.png" alt="Magpie Studio" className="h-8 w-auto" />
+                <img src="/brand/magpie-logo-purple.png" alt="Magpie Studio" className="h-12 w-auto" />
               </Link>
               <button
                 type="button"
