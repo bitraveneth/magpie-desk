@@ -7,8 +7,9 @@ import { company, paymentDefaults } from "@/content/company";
 const pageWidth = 595.28;
 const pageHeight = 841.89;
 const margin = 48;
-const footerBand = 64;
-const contentFloor = 86;
+const footerBand = 108;
+const contentFloor = 126;
+const accentStrong = rgb(0.29, 0.141, 0.463);
 const ink = rgb(0.059, 0.059, 0.059);
 const muted = rgb(0.42, 0.396, 0.376);
 const accent = rgb(0.361, 0.176, 0.569);
@@ -293,25 +294,58 @@ function drawMasthead(pen: Pen, first: boolean) {
   pen.y = pageHeight - 60;
 }
 
+function footerAddressLines(address: string, width: number, latin: PDFFont, cjk: PDFFont | null): string[] {
+  const splitAt = address.indexOf(" ");
+  const phrases = splitAt > 8 ? [address.slice(0, splitAt), address.slice(splitAt + 1)] : [address];
+  return phrases.flatMap((phrase) => wrapParagraph(phrase, 8, width, latin, cjk)).slice(0, 3);
+}
+
 function drawFooter(pen: Pen, page: PDFPage, index: number, total: number) {
-  page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: footerBand, color: accent });
-  const phone = displayPhone(pen.footer.phone);
-  const phoneWidth = widthOf(phone, 9, pen.bold, pen.cjk);
-  drawAt(page, pen.footer.companyName, margin, 40, 9, pen.bold, pen.cjk, white);
-  const nameWidth = widthOf(pen.footer.companyName, 9, pen.bold, pen.cjk);
-  const englishWidth = widthOf(pen.footer.nameEn, 8, pen.latin, pen.cjk);
-  if (margin + nameWidth + 16 + englishWidth < pageWidth - margin - phoneWidth - 18) {
-    drawAt(page, pen.footer.nameEn, margin + nameWidth + 14, 40, 8, pen.latin, pen.cjk, white);
+  const bar = 20;
+  page.drawRectangle({ x: 0, y: bar, width: pageWidth, height: footerBand - bar, color: cream });
+  page.drawRectangle({ x: 0, y: footerBand - 3, width: pageWidth, height: 3, color: accent });
+  page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: bar, color: accentStrong });
+
+  const columns = [
+    { x: 36, width: 176 },
+    { x: 224, width: 196 },
+    { x: 432, width: 128 },
+  ];
+  for (const edge of [216, 424]) {
+    page.drawLine({
+      start: { x: edge, y: 34 },
+      end: { x: edge, y: footerBand - 16 },
+      thickness: 0.6,
+      color: rule,
+    });
   }
-  drawAt(page, phone, pageWidth - margin - phoneWidth, 40, 9, pen.bold, pen.cjk, white);
-  const addressLines = wrapParagraph(pen.footer.address, 8, pageWidth - margin * 2 - 54, pen.latin, pen.cjk).slice(0, 2);
-  addressLines.forEach((line, lineIndex) => {
-    drawAt(page, line, margin, 24 - lineIndex * 11, 8, pen.latin, pen.cjk, white);
+
+  const phone = displayPhone(pen.footer.phone);
+  const blocks = [
+    { label: "COMPANY", lines: [pen.footer.companyName, pen.footer.nameEn] },
+    { label: "ADDRESS", lines: footerAddressLines(pen.footer.address, columns[1].width, pen.latin, pen.cjk) },
+    { label: "PHONE", lines: [phone, company.email] },
+  ];
+  blocks.forEach((block, blockIndex) => {
+    const column = columns[blockIndex];
+    drawAt(page, block.label, column.x, 86, 7, pen.bold, pen.cjk, accent);
+    block.lines.forEach((line, lineIndex) => {
+      const size = lineIndex === 0 ? 9 : 8;
+      const font = lineIndex === 0 ? pen.bold : pen.latin;
+      const color = lineIndex === 0 ? ink : muted;
+      wrapParagraph(line, size, column.width, font, pen.cjk)
+        .slice(0, 2)
+        .forEach((text, wrapIndex) => {
+          drawAt(page, text, column.x, 70 - lineIndex * 14 - wrapIndex * 11, size, font, pen.cjk, color);
+        });
+    });
   });
-  const label = `${index + 1} / ${total}`;
+
+  const label = `${index + 1}  /  ${total}`;
+  const labelWidth = pen.latin.widthOfTextAtSize(label, 8);
   page.drawText(label, {
-    x: pageWidth - margin - pen.latin.widthOfTextAtSize(label, 8),
-    y: 14,
+    x: (pageWidth - labelWidth) / 2,
+    y: 6,
     size: 8,
     font: pen.latin,
     color: white,
