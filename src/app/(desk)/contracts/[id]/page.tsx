@@ -39,9 +39,12 @@ export default async function ContractPage({
         contractId={contract.id}
         invoiceId={contract.invoice?.id}
       />
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <Badge>{signed ? "Signed" : "Draft"}</Badge>
         {signed && contract.signedAt ? <Badge>Signed {shanghaiDate(contract.signedAt)}</Badge> : null}
+        <Button href={`/contracts/${contract.id}/pdf`} variant="outline">
+          Download PDF
+        </Button>
       </div>
       <Card>
         <Letterhead

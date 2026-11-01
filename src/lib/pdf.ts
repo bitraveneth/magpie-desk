@@ -2,13 +2,18 @@ import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage, type RGB } from "pdf-lib";
+import { company, paymentDefaults } from "@/content/company";
 
 const pageWidth = 595.28;
 const pageHeight = 841.89;
 const margin = 48;
+const footerBand = 64;
+const contentFloor = 86;
 const ink = rgb(0.059, 0.059, 0.059);
 const muted = rgb(0.42, 0.396, 0.376);
 const accent = rgb(0.361, 0.176, 0.569);
+const cream = rgb(0.965, 0.949, 0.918);
+const white = rgb(1, 1, 1);
 const rule = rgb(0.898, 0.875, 0.831);
 
 export type PdfParty = {
@@ -18,6 +23,29 @@ export type PdfParty = {
   email: string;
   address: string;
 };
+
+export type PdfFooter = {
+  companyName: string;
+  nameEn: string;
+  address: string;
+  phone: string;
+};
+
+export function documentFooter(payments?: { companyName?: string; address?: string; phone?: string } | null): PdfFooter {
+  return {
+    companyName: payments?.companyName?.trim() || paymentDefaults.companyName,
+    nameEn: company.nameEn,
+    address: (payments?.address || paymentDefaults.address).replace(/\s*\n\s*/g, " ").trim(),
+    phone: payments?.phone?.trim() || paymentDefaults.phone,
+  };
+}
+
+function displayPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "+8613620979734";
+  if (digits.startsWith("86")) return `+${digits}`;
+  return `+86${digits}`;
+}
 
 export type RequirementPdfInput = {
   party: PdfParty;
@@ -29,6 +57,7 @@ export type RequirementPdfInput = {
   status: string;
   sections: { label: string; rows: { label: string; value: string }[] }[];
   signature?: { name: string; email: string; date: string } | null;
+  footer?: PdfFooter;
 };
 
 export type LinesPdfInput = {
@@ -42,6 +71,7 @@ export type LinesPdfInput = {
   total: string;
   note: string;
   payment?: { title: string; lines: string[]; image?: { bytes: Uint8Array; mime: string } | null } | null;
+  footer?: PdfFooter;
 };
 
 type Pen = {
@@ -51,6 +81,9 @@ type Pen = {
   latin: PDFFont;
   bold: PDFFont;
   cjk: PDFFont | null;
+  logo: PDFImage | null;
+  footer: PdfFooter;
+  masthead: { title: string; number: string; date: string };
 };
 
 const encodeCache = new WeakMap<PDFFont, Map<string, boolean>>();
@@ -194,11 +227,13 @@ function wrapParagraph(paragraph: string, size: number, maxWidth: number, latin:
 }
 
 function ensure(pen: Pen, height: number) {
-  if (pen.y - height >= margin) return;
+  if (pen.y - height >= contentFloor) return;
+  turnPage(pen);
+}
+
+function turnPage(pen: Pen) {
   pen.page = pen.doc.addPage([pageWidth, pageHeight]);
-  pen.y = pageHeight - margin;
-  drawAt(pen.page, pen.doc.getTitle() || "Magpie Studio", margin, pen.y - 10, 9, pen.latin, pen.cjk, muted);
-  pen.y -= 24;
+  drawMasthead(pen, false);
 }
 
 function drawWrapped(pen: Pen, text: string, size: number, color: RGB, bold = false, gap = 4, width = pageWidth - margin * 2) {
@@ -228,17 +263,71 @@ async function loadFontkit() {
   return imported.default ?? imported;
 }
 
-async function startPdf(party: PdfParty, documentName: string, number: string, client: string, project: string, date: string) {
+function drawMasthead(pen: Pen, first: boolean) {
+  const page = pen.page;
+  const right = pageWidth - margin;
+  const title = pen.masthead.title.toUpperCase();
+  if (first) {
+    page.drawRectangle({ x: 0, y: pageHeight - 118, width: pageWidth, height: 118, color: cream });
+    page.drawRectangle({ x: 0, y: pageHeight - 124, width: pageWidth, height: 6, color: accent });
+    if (pen.logo) {
+      const height = 72;
+      const width = (pen.logo.width / pen.logo.height) * height;
+      page.drawImage(pen.logo, { x: margin, y: pageHeight - 24 - height, width, height });
+    }
+    drawAt(page, title, right - widthOf(title, 22, pen.bold, pen.cjk), pageHeight - 46, 22, pen.bold, pen.cjk, accent);
+    drawAt(page, pen.masthead.number, right - widthOf(pen.masthead.number, 11, pen.bold, pen.cjk), pageHeight - 68, 11, pen.bold, pen.cjk, ink);
+    drawAt(page, pen.masthead.date, right - widthOf(pen.masthead.date, 10, pen.latin, pen.cjk), pageHeight - 84, 10, pen.latin, pen.cjk, muted);
+    pen.y = pageHeight - 146;
+    return;
+  }
+  page.drawRectangle({ x: 0, y: pageHeight - 40, width: pageWidth, height: 40, color: cream });
+  page.drawRectangle({ x: 0, y: pageHeight - 44, width: pageWidth, height: 4, color: accent });
+  if (pen.logo) {
+    const height = 22;
+    const width = (pen.logo.width / pen.logo.height) * height;
+    page.drawImage(pen.logo, { x: margin, y: pageHeight - 10 - height, width, height });
+  }
+  const label = `${title}  ${pen.masthead.number}`;
+  drawAt(page, label, right - widthOf(label, 9, pen.bold, pen.cjk), pageHeight - 26, 9, pen.bold, pen.cjk, accent);
+  pen.y = pageHeight - 60;
+}
+
+function drawFooter(pen: Pen, page: PDFPage, index: number, total: number) {
+  page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: footerBand, color: accent });
+  const phone = displayPhone(pen.footer.phone);
+  const phoneWidth = widthOf(phone, 9, pen.bold, pen.cjk);
+  drawAt(page, pen.footer.companyName, margin, 40, 9, pen.bold, pen.cjk, white);
+  const nameWidth = widthOf(pen.footer.companyName, 9, pen.bold, pen.cjk);
+  const englishWidth = widthOf(pen.footer.nameEn, 8, pen.latin, pen.cjk);
+  if (margin + nameWidth + 16 + englishWidth < pageWidth - margin - phoneWidth - 18) {
+    drawAt(page, pen.footer.nameEn, margin + nameWidth + 14, 40, 8, pen.latin, pen.cjk, white);
+  }
+  drawAt(page, phone, pageWidth - margin - phoneWidth, 40, 9, pen.bold, pen.cjk, white);
+  const addressLines = wrapParagraph(pen.footer.address, 8, pageWidth - margin * 2 - 54, pen.latin, pen.cjk).slice(0, 2);
+  addressLines.forEach((line, lineIndex) => {
+    drawAt(page, line, margin, 24 - lineIndex * 11, 8, pen.latin, pen.cjk, white);
+  });
+  const label = `${index + 1} / ${total}`;
+  page.drawText(label, {
+    x: pageWidth - margin - pen.latin.widthOfTextAtSize(label, 8),
+    y: 14,
+    size: 8,
+    font: pen.latin,
+    color: white,
+  });
+}
+
+async function openPen(input: { party: PdfParty; title: string; number: string; date: string; footer?: PdfFooter }): Promise<Pen> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`${party.publicName} ${documentName} ${number}`);
-  doc.setAuthor(party.nameEn);
+  doc.setTitle(`${input.party.publicName} ${input.title} ${input.number}`);
+  doc.setAuthor(input.party.nameEn);
   doc.registerFontkit((await loadFontkit()) as Parameters<PDFDocument["registerFontkit"]>[0]);
   const latin = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   let cjk: PDFFont | null = null;
   try {
-    const bytes = await readFile(path.join(process.cwd(), "src/fonts/wqy-microhei.ttf"));
-    cjk = await doc.embedFont(bytes, { subset: true });
+    cjk = await doc.embedFont(await readFile(path.join(process.cwd(), "src/fonts/wqy-microhei.ttf")), { subset: true });
   } catch {
     cjk = null;
   }
@@ -248,38 +337,34 @@ async function startPdf(party: PdfParty, documentName: string, number: string, c
   } catch {
     logo = null;
   }
+  const pen: Pen = {
+    doc,
+    page: doc.addPage([pageWidth, pageHeight]),
+    y: pageHeight - margin,
+    latin,
+    bold,
+    cjk,
+    logo,
+    footer: input.footer ?? documentFooter(),
+    masthead: { title: input.title, number: input.number, date: input.date },
+  };
+  drawMasthead(pen, true);
+  return pen;
+}
 
-  const page = doc.addPage([pageWidth, pageHeight]);
-  const pen: Pen = { doc, page, y: pageHeight - margin, latin, bold, cjk };
-  if (logo) {
-    const height = 34;
-    const width = (logo.width / logo.height) * height;
-    page.drawImage(logo, { x: margin, y: pen.y - height, width, height });
-  }
-  const rightLines = [party.nameZh, party.nameEn, ...party.address.split("\n"), party.email];
-  rightLines.forEach((line, index) => {
-    const size = index === 0 ? 10 : 9;
-    const font = index === 1 ? bold : latin;
-    const textWidth = widthOf(line, size, font, cjk);
-    drawAt(page, line, pageWidth - margin - textWidth, pen.y - 12 - index * 13, size, font, cjk, index < 2 ? ink : muted);
-  });
-  pen.y -= Math.max(48, rightLines.length * 13 + 8);
-  drawRule(pen);
-  drawWrapped(pen, documentName, 20, ink, true, 6);
-  drawWrapped(pen, number, 11, accent, true, 4);
-  drawWrapped(pen, date, 10, muted, false, 8);
+async function startPdf(party: PdfParty, documentName: string, number: string, client: string, project: string, date: string, footer?: PdfFooter) {
+  const pen = await openPen({ party, title: documentName, number, date, footer });
+  drawAt(pen.page, "PREPARED FOR", margin, pen.y, 8, pen.bold, pen.cjk, muted);
+  pen.y -= 16;
   drawWrapped(pen, client || "Client", 13, ink, true, 3);
-  if (project) drawWrapped(pen, project, 10, muted, false, 4);
+  if (project) drawWrapped(pen, project, 10, muted, false, 6);
+  pen.y -= 6;
   return pen;
 }
 
 function finish(pen: Pen): Promise<Uint8Array> {
   const pages = pen.doc.getPages();
-  pages.forEach((page, index) => {
-    const label = `${index + 1} / ${pages.length}`;
-    const width = pen.latin.widthOfTextAtSize(label, 9);
-    page.drawText(label, { x: pageWidth - margin - width, y: 28, size: 9, font: pen.latin, color: muted });
-  });
+  pages.forEach((page, index) => drawFooter(pen, page, index, pages.length));
   return pen.doc.save();
 }
 
@@ -295,7 +380,7 @@ export function pdfResponse(bytes: Uint8Array, filename: string) {
 
 export async function buildRequirementPdf(input: RequirementPdfInput): Promise<Uint8Array> {
   const client = input.clientCompany || input.clientName;
-  const pen = await startPdf(input.party, "Requirement", input.number, client, input.title, input.date);
+  const pen = await startPdf(input.party, "Requirement", input.number, client, input.title, input.date, input.footer);
   drawWrapped(pen, input.status, 10, muted, false, 10);
   pen.y -= 4;
   drawWrapped(pen, "Parties", 13, accent, true, 8);
@@ -309,7 +394,9 @@ export async function buildRequirementPdf(input: RequirementPdfInput): Promise<U
   for (const section of input.sections) {
     if (section.rows.length === 0) continue;
     pen.y -= 6;
-    drawWrapped(pen, section.label, 13, accent, true, 8);
+    drawWrapped(pen, section.label, 13, accent, true, 4);
+    pen.page.drawRectangle({ x: margin, y: pen.y + 2, width: 36, height: 2, color: accent });
+    pen.y -= 8;
     for (const row of section.rows) {
       drawWrapped(pen, row.label, 10, ink, true, 3);
       drawWrapped(pen, row.value, 10, ink, false, 8);
@@ -343,47 +430,15 @@ export type InvoicePdfInput = {
   seller: { label: string; value: string }[];
   note: string;
   image?: { bytes: Uint8Array; mime: string } | null;
+  footer?: PdfFooter;
 };
 
 export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  doc.setTitle(`${input.party.publicName} Invoice ${input.number}`);
-  doc.setAuthor(input.party.nameEn);
-  doc.registerFontkit((await loadFontkit()) as Parameters<PDFDocument["registerFontkit"]>[0]);
-  const latin = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  let cjk: PDFFont | null = null;
-  try {
-    // WenQuanYi Micro Hei (Apache 2.0). A hairline Noto cut disappears when the PDF is printed.
-    cjk = await doc.embedFont(await readFile(path.join(process.cwd(), "src/fonts/wqy-microhei.ttf")), { subset: true });
-  } catch {
-    cjk = null;
-  }
-  let logo: PDFImage | null = null;
-  try {
-    logo = await doc.embedPng(await readFile(path.join(process.cwd(), "public/brand/magpie-logo-purple.png")));
-  } catch {
-    logo = null;
-  }
-  const brand = rgb(0.361, 0.176, 0.569);
-  const cream = rgb(0.965, 0.949, 0.918);
-  const white = rgb(1, 1, 1);
-  const page = doc.addPage([pageWidth, pageHeight]);
-  const pen: Pen = { doc, page, y: pageHeight - 156, latin, bold, cjk };
+  const pen = await openPen({ party: input.party, title: "Invoice", number: input.number, date: input.date, footer: input.footer });
+  const { latin, bold, cjk } = pen;
+  const page = pen.page;
+  const brand = accent;
   const right = pageWidth - margin;
-  page.drawRectangle({ x: 0, y: pageHeight - 148, width: pageWidth, height: 148, color: cream });
-  page.drawRectangle({ x: 0, y: pageHeight - 154, width: pageWidth, height: 6, color: brand });
-  if (logo) {
-    const height = 86;
-    const width = (logo.width / logo.height) * height;
-    page.drawImage(logo, { x: margin, y: pageHeight - 32 - height, width, height });
-  }
-  const drawRight = (text: string, y: number, size: number, font: PDFFont, color: RGB) => {
-    drawAt(page, text, right - widthOf(text, size, font, cjk), y, size, font, cjk, color);
-  };
-  drawRight("INVOICE", pageHeight - 52, 22, bold, brand);
-  drawRight(input.number, pageHeight - 74, 11, bold, ink);
-  drawRight(input.date, pageHeight - 90, 10, latin, muted);
 
   const sellerValue = (label: string) => input.seller.find((item) => item.label === label)?.value ?? "";
   const billX = margin + 270;
@@ -445,11 +500,8 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   const amountRight = right - 6;
 
   function room(height: number) {
-    if (pen.y - height >= margin + 24) return;
-    pen.page = pen.doc.addPage([pageWidth, pageHeight]);
-    pen.y = pageHeight - margin;
-    drawAt(pen.page, input.number, margin, pen.y - 10, 9, latin, cjk, muted);
-    pen.y -= 26;
+    if (pen.y - height >= contentFloor) return;
+    turnPage(pen);
   }
 
   function tableHeader() {
@@ -542,42 +594,64 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   return finish(pen);
 }
 
+export async function buildContractPdf(input: {
+  party: PdfParty;
+  number: string;
+  date: string;
+  clientName: string;
+  clientCompany: string;
+  project: string;
+  status: string;
+  body: string;
+  footer?: PdfFooter;
+}): Promise<Uint8Array> {
+  const client = input.clientCompany || input.clientName;
+  const pen = await startPdf(input.party, "Contract", input.number, client, input.project, input.date, input.footer);
+  drawWrapped(pen, input.status, 10, muted, false, 10);
+  drawWrapped(pen, "Parties", 13, accent, true, 8);
+  drawWrapped(pen, input.party.nameZh, 11, ink, true, 2);
+  drawWrapped(pen, input.party.nameEn, 10, ink, false, 2);
+  drawWrapped(pen, "Client", 11, ink, true, 8);
+  drawWrapped(pen, client || "Client", 11, ink, true, 2);
+  if (input.clientName && input.clientCompany) drawWrapped(pen, input.clientName, 10, ink, false, 8);
+  else pen.y -= 6;
+  drawWrapped(pen, "Agreement", 13, accent, true, 8);
+  drawWrapped(pen, input.body, 10, ink, false, 4);
+  return finish(pen);
+}
+
 export async function buildLinesPdf(input: LinesPdfInput): Promise<Uint8Array> {
-  const pen = await startPdf(input.party, input.documentName, input.number, input.client, input.project, input.date);
-  const descWidth = 300;
-  ensure(pen, 18);
-  drawAt(pen.page, "Description", margin, pen.y - 10, 9, pen.bold, pen.cjk, muted);
-  drawAt(pen.page, "Qty", margin + 320, pen.y - 10, 9, pen.bold, pen.cjk, muted);
-  const amountHeader = "Amount";
-  drawAt(
-    pen.page,
-    amountHeader,
-    pageWidth - margin - pen.bold.widthOfTextAtSize(amountHeader, 9),
-    pen.y - 10,
-    9,
-    pen.bold,
-    pen.cjk,
-    muted,
-  );
-  pen.y -= 16;
-  drawRule(pen);
-  for (const line of input.lines) {
+  const pen = await startPdf(input.party, input.documentName, input.number, input.client, input.project, input.date, input.footer);
+  const descWidth = 280;
+  const qtyX = margin + 300;
+  const amountRight = pageWidth - margin;
+  ensure(pen, 28);
+  pen.page.drawRectangle({ x: margin, y: pen.y - 18, width: pageWidth - margin * 2, height: 22, color: accent });
+  drawAt(pen.page, "DESCRIPTION", margin + 6, pen.y - 13, 8, pen.bold, pen.cjk, white);
+  drawAt(pen.page, "QTY", qtyX, pen.y - 13, 8, pen.bold, pen.cjk, white);
+  drawAt(pen.page, "AMOUNT", amountRight - widthOf("AMOUNT", 8, pen.bold, pen.cjk) - 6, pen.y - 13, 8, pen.bold, pen.cjk, white);
+  pen.y -= 26;
+  input.lines.forEach((line, index) => {
     const wrapped = wrapParagraph(line.description, 10, descWidth, pen.latin, pen.cjk);
-    const height = wrapped.length * 14 + 8;
+    const height = Math.max(22, wrapped.length * 13 + 8);
     ensure(pen, height);
-    wrapped.forEach((text, index) => {
-      drawAt(pen.page, text, margin, pen.y - 11 - index * 14, 10, pen.latin, pen.cjk, ink);
+    if (index % 2 === 1) {
+      pen.page.drawRectangle({ x: margin, y: pen.y - height + 4, width: pageWidth - margin * 2, height: height - 2, color: cream });
+    }
+    wrapped.forEach((text, lineIndex) => {
+      drawAt(pen.page, text, margin + 6, pen.y - 12 - lineIndex * 13, 10, pen.latin, pen.cjk, ink);
     });
-    drawAt(pen.page, line.quantity, margin + 320, pen.y - 11, 10, pen.latin, pen.cjk, ink);
+    drawAt(pen.page, line.quantity, qtyX, pen.y - 12, 10, pen.latin, pen.cjk, ink);
     const amountWidth = widthOf(line.amount, 10, pen.bold, pen.cjk);
-    drawAt(pen.page, line.amount, pageWidth - margin - amountWidth, pen.y - 11, 10, pen.bold, pen.cjk, ink);
+    drawAt(pen.page, line.amount, amountRight - amountWidth - 6, pen.y - 12, 10, pen.bold, pen.cjk, ink);
     pen.y -= height;
-  }
-  drawRule(pen);
-  const totalWidth = widthOf(input.total, 13, pen.bold, pen.cjk);
-  ensure(pen, 20);
-  drawAt(pen.page, input.total, pageWidth - margin - totalWidth, pen.y - 13, 13, pen.bold, pen.cjk, ink);
-  pen.y -= 28;
+  });
+  pen.y -= 12;
+  ensure(pen, 28);
+  const totalWidth = widthOf(input.total, 12, pen.bold, pen.cjk);
+  pen.page.drawRectangle({ x: pageWidth - margin - totalWidth - 28, y: pen.y - 22, width: totalWidth + 28, height: 28, color: accent });
+  drawAt(pen.page, input.total, pageWidth - margin - totalWidth - 14, pen.y - 16, 12, pen.bold, pen.cjk, white);
+  pen.y -= 40;
   if (input.note) drawWrapped(pen, input.note, 10, muted, false, 6);
   if (input.payment) {
     pen.y -= 8;

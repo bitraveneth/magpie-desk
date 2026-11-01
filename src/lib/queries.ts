@@ -398,6 +398,17 @@ export async function takeDocumentNumber(companyName: string, kind?: "NDA") {
   throw new Error("Could not generate a unique document number");
 }
 
+export async function listQuotations() {
+  await ensureDesk();
+  return prisma.quotation.findMany({
+    orderBy: { updatedAt: "desc" },
+    include: {
+      lines: { orderBy: { sort: "asc" } },
+      requirement: { select: { id: true, title: true, clientName: true, clientCompany: true, sample: true } },
+    },
+  });
+}
+
 export async function takeShortNumber(prefix: "REQ" | "QUO" | "INV") {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const number = shortNumber(prefix, new Date(), uniqueCode());

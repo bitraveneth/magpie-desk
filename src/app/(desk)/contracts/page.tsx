@@ -53,6 +53,9 @@ export default async function ContractsPage() {
                         <Link href={`/contracts/${contract.id}`} className="text-brand-500 hover:text-brand-600">
                           View
                         </Link>
+                        <Link href={`/contracts/${contract.id}/pdf`} className="ml-4 text-brand-500 hover:text-brand-600">
+                          PDF
+                        </Link>
                       </td>
                     </tr>
                   );

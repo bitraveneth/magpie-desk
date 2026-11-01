@@ -1,6 +1,6 @@
 import { company } from "@/content/company";
 import { discountedLine, money, shanghaiDay, invoiceTotals } from "@/lib/money";
-import { buildInvoicePdf, pdfResponse } from "@/lib/pdf";
+import { buildInvoicePdf, documentFooter, pdfResponse } from "@/lib/pdf";
 import { getInvoiceRecord, getPayments, invoiceParties } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +59,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     ],
     note: invoice.status === "PAID" ? "Paid." : invoice.status === "ISSUED" ? "Issued." : "Draft.",
     image,
+    footer: documentFooter(payments),
   });
   return pdfResponse(bytes, `${invoice.number}.pdf`);
 }

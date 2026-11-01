@@ -1,8 +1,8 @@
 import { company } from "@/content/company";
 import { shanghaiDate, shanghaiDay } from "@/lib/money";
-import { pdfResponse, buildRequirementPdf } from "@/lib/pdf";
+import { pdfResponse, buildRequirementPdf, documentFooter } from "@/lib/pdf";
 import { requirementPdfInput } from "@/lib/requirement-document";
-import { getJobByToken, listQuestions } from "@/lib/queries";
+import { getJobByToken, getPayments, listQuestions } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,9 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
   const job = await getJobByToken(token);
   if (!job) return new Response("Not found", { status: 404 });
   const questions = await listQuestions();
-  const bytes = await buildRequirementPdf(
-    requirementPdfInput({
+  const payments = await getPayments();
+  const bytes = await buildRequirementPdf({
+    ...requirementPdfInput({
       party: company,
       number: job.number,
       title: job.title,
@@ -27,6 +28,7 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
       answers: job.answers,
       files: job.files,
     }),
-  );
+    footer: documentFooter(payments),
+  });
   return pdfResponse(bytes, `${job.number}.pdf`);
 }

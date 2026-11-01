@@ -1,7 +1,7 @@
 import { company } from "@/content/company";
 import { money, shanghaiDay, sumLines } from "@/lib/money";
-import { buildLinesPdf, pdfResponse } from "@/lib/pdf";
-import { getJobByQuotation } from "@/lib/queries";
+import { buildLinesPdf, documentFooter, pdfResponse } from "@/lib/pdf";
+import { getJobByQuotation, getPayments } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const quotation = job?.quotation;
   if (!job || !quotation || quotation.id !== id) return new Response("Not found", { status: 404 });
   const total = sumLines(quotation.lines);
+  const payments = await getPayments();
   const bytes = await buildLinesPdf({
     party: company,
     documentName: "Quotation",
@@ -25,6 +26,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     })),
     total: `Total ${money(total, quotation.currency)}`,
     note: "This quotation is the price. Work starts after it is accepted and the contract is signed.",
+    footer: documentFooter(payments),
   });
   return pdfResponse(bytes, `${quotation.number}.pdf`);
 }
