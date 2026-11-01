@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Banner, Field, PageTitle } from "@/components/desk/DeskShell";
 import { savePayments } from "@/lib/mutations";
 import { getPayments } from "@/lib/queries";
@@ -19,11 +20,23 @@ export default async function PaymentsPage({
       <PageTitle
         kicker="Payments"
         title="Company QR or bank slip"
-        text="These details stay empty until you add them. An invoice shows only the one you choose."
+        text="The company payment details are filled in. An invoice shows only the company QR or these bank details, whichever you choose."
       />
       <Banner error={messages.error} notice={messages.notice} />
       <Card>
         <form action={savePayments} className="grid gap-4">
+          <Field label="Company name">
+            <Input name="companyName" defaultValue={payments.companyName} />
+          </Field>
+          <Field label="Tax number">
+            <Input name="taxNumber" defaultValue={payments.taxNumber} />
+          </Field>
+          <Field label="Address">
+            <Textarea name="address" rows={3} defaultValue={payments.address} />
+          </Field>
+          <Field label="Phone">
+            <Input name="phone" defaultValue={payments.phone} />
+          </Field>
           <Field label="Bank name">
             <Input name="bankName" defaultValue={payments.bankName} />
           </Field>

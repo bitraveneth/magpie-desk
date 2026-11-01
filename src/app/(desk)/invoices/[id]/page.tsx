@@ -8,7 +8,7 @@ import { Chain } from "@/components/desk/Chain";
 import { Letterhead } from "@/components/desk/Letterhead";
 import { issueInvoice, markInvoicePaid, setPaymentMethod } from "@/lib/mutations";
 import { money, shanghaiDate, shanghaiDay, sumLines } from "@/lib/money";
-import { getJobByInvoice, getPayments } from "@/lib/queries";
+import { getJobByInvoice, getPayments, paymentDetailLines } from "@/lib/queries";
 
 export default async function InvoicePage({
   params,
@@ -135,6 +135,10 @@ function PaymentInstruction({
 }: {
   method: "COMPANY_QR" | "BANK_SLIP" | null;
   payments: {
+    companyName: string;
+    taxNumber: string;
+    address: string;
+    phone: string;
     bankName: string;
     accountName: string;
     accountNumber: string;
@@ -162,8 +166,8 @@ function PaymentInstruction({
       />
     );
   }
-  const hasText = payments.bankName || payments.accountName || payments.accountNumber;
-  if (!hasText && !payments.slipImage) {
+  const lines = paymentDetailLines(payments);
+  if (lines.length === 0 && !payments.slipImage) {
     return (
       <p className="text-sm text-muted">
         No bank slip yet. Add the details in <a className="font-semibold text-accent" href="/settings/payments">payment settings</a>.
@@ -172,9 +176,9 @@ function PaymentInstruction({
   }
   return (
     <div className="grid gap-3 text-sm">
-      {payments.bankName ? <p>Bank: {payments.bankName}</p> : null}
-      {payments.accountName ? <p>Account name: {payments.accountName}</p> : null}
-      {payments.accountNumber ? <p>Account number: {payments.accountNumber}</p> : null}
+      {lines.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
       {payments.slipImage ? (
         <Image
           src="/files/slip"

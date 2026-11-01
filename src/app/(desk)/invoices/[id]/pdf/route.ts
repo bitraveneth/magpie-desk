@@ -1,7 +1,7 @@
 import { company } from "@/content/company";
 import { money, shanghaiDay, sumLines } from "@/lib/money";
 import { buildLinesPdf, pdfResponse } from "@/lib/pdf";
-import { getJobByInvoice, getPayments } from "@/lib/queries";
+import { getJobByInvoice, getPayments, paymentDetailLines } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +23,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       : method === "BANK_SLIP"
         ? {
             title: "Pay with the bank slip",
-            lines: [
-              payments.bankName ? `Bank: ${payments.bankName}` : "",
-              payments.accountName ? `Account name: ${payments.accountName}` : "",
-              payments.accountNumber ? `Account number: ${payments.accountNumber}` : "",
-            ].filter(Boolean),
+            lines: paymentDetailLines(payments),
             image: payments.slipImage ? { bytes: new Uint8Array(payments.slipImage), mime: payments.slipMime || "image/png" } : null,
           }
         : { title: "Payment", lines: ["A payment method has not been chosen yet."], image: null };

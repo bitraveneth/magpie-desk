@@ -69,6 +69,10 @@ model CompanyProfile {
 
 model PaymentSettings {
   id            String  @id
+  companyName   String  @default("")
+  taxNumber     String  @default("")
+  address       String  @default("")
+  phone         String  @default("")
   bankName      String  @default("")
   accountName   String  @default("")
   accountNumber String  @default("")

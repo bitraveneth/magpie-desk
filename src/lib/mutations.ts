@@ -498,6 +498,10 @@ export async function savePayments(formData: FormData) {
   await prisma.paymentSettings.update({
     where: { id: "payments" },
     data: {
+      companyName: text(formData, "companyName"),
+      taxNumber: text(formData, "taxNumber"),
+      address: text(formData, "address"),
+      phone: text(formData, "phone"),
       bankName: text(formData, "bankName"),
       accountName: text(formData, "accountName"),
       accountNumber: text(formData, "accountNumber"),

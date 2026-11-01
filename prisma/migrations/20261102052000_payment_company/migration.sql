@@ -1,0 +1,4 @@
+ALTER TABLE "PaymentSettings" ADD COLUMN "companyName" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "PaymentSettings" ADD COLUMN "taxNumber" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "PaymentSettings" ADD COLUMN "address" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "PaymentSettings" ADD COLUMN "phone" TEXT NOT NULL DEFAULT '';

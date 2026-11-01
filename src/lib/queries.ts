@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { company } from "@/content/company";
+import { company, paymentDefaults } from "@/content/company";
 import { questionBank } from "@/content/questions";
 import { ensurePipelineSamples } from "@/lib/sample-pipeline";
 import { prisma } from "@/lib/db";
@@ -74,11 +74,7 @@ async function loadDesk() {
     },
   });
 
-  await prisma.paymentSettings.upsert({
-    where: { id: "payments" },
-    update: {},
-    create: { id: "payments" },
-  });
+  await ensurePaymentDefaults();
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(8421101)`;
@@ -219,9 +215,43 @@ export async function getCompany() {
   return profile;
 }
 
+export async function ensurePaymentDefaults() {
+  const row = await prisma.paymentSettings.upsert({
+    where: { id: "payments" },
+    update: {},
+    create: { id: "payments", ...paymentDefaults },
+  });
+  const blank = !row.companyName && !row.taxNumber && !row.bankName && !row.accountName && !row.accountNumber;
+  if (!blank) return row;
+  return prisma.paymentSettings.update({
+    where: { id: "payments" },
+    data: { ...paymentDefaults },
+  });
+}
+
 export async function getPayments() {
   await ensureDesk();
-  return prisma.paymentSettings.findUniqueOrThrow({ where: { id: "payments" } });
+  return ensurePaymentDefaults();
+}
+
+export function paymentDetailLines(payments: {
+  companyName: string;
+  taxNumber: string;
+  address: string;
+  phone: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+}) {
+  return [
+    payments.companyName ? `Company: ${payments.companyName}` : "",
+    payments.taxNumber ? `Tax number: ${payments.taxNumber}` : "",
+    payments.address ? `Address: ${payments.address}` : "",
+    payments.phone ? `Phone: ${payments.phone}` : "",
+    payments.bankName ? `Bank: ${payments.bankName}` : "",
+    payments.accountName ? `Account name: ${payments.accountName}` : "",
+    payments.accountNumber ? `Account number: ${payments.accountNumber}` : "",
+  ].filter(Boolean);
 }
 
 export async function getJob(id: string) {
