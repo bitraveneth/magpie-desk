@@ -27,6 +27,15 @@ export function currencyCode(value: string): string {
   return /^[A-Z]{3}$/.test(code) ? code : "USD";
 }
 
+export function shanghaiDay(when: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(when);
+}
+
 export function shanghaiDate(when: Date): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Shanghai",

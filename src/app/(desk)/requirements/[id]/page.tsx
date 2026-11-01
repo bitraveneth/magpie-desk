@@ -8,8 +8,10 @@ import { Banner, Field, PageTitle, SampleNote } from "@/components/desk/DeskShel
 import { Chain } from "@/components/desk/Chain";
 import { CopyLink } from "@/components/desk/CopyLink";
 import { quoteTemplates } from "@/content/company";
-import { createQuotation, offerNda, setRequirementStatus, updateRequirement } from "@/lib/mutations";
-import { getJob, origin } from "@/lib/queries";
+import { briefLabel } from "@/lib/brief";
+import { createQuotation, offerNda, updateRequirement } from "@/lib/mutations";
+import { answeredSections } from "@/lib/requirement-document";
+import { getJob, listQuestions, origin } from "@/lib/queries";
 import { shanghaiDate } from "@/lib/money";
 
 export default async function RequirementDetailPage({
@@ -23,7 +25,10 @@ export default async function RequirementDetailPage({
   const messages = await searchParams;
   const job = await getJob(id);
   if (!job) notFound();
+  const questions = await listQuestions();
+  const review = answeredSections({ questions, answers: job.answers, files: job.files });
   const link = `${await origin()}/r/${job.shareToken}`;
+  const filled = job.briefStatus !== "SENT";
 
   return (
     <>
@@ -37,7 +42,7 @@ export default async function RequirementDetailPage({
         invoiceId={job.quotation?.contract?.invoice?.id}
       />
       <div className="mb-4 flex flex-wrap gap-2">
-        <Badge>{job.status === "READY" ? "Ready" : "Draft"}</Badge>
+        <Badge>{briefLabel(job.briefStatus)}</Badge>
         <SampleNote sample={job.sample} />
         {job.partner ? <Badge>Partner: {job.partner.name}</Badge> : <Badge>No partner</Badge>}
       </div>
@@ -66,34 +71,39 @@ export default async function RequirementDetailPage({
         <div className="grid gap-6">
           <Card>
             <h2 className="text-lg font-semibold">Requirement link</h2>
-            <p className="mt-2 text-sm text-muted">Anyone with this link can read the brief, update it, and sign in.</p>
+            <p className="mt-2 text-sm text-muted">Send this link to the client. They fill the questionnaire, download the PDF, and can sign it.</p>
             <div className="mt-4">
               <CopyLink url={link} label="Requirement link" />
             </div>
           </Card>
           <Card>
-            <h2 className="text-lg font-semibold">Status</h2>
-            <form action={setRequirementStatus} className="mt-4">
-              <input type="hidden" name="id" value={job.id} />
-              <input type="hidden" name="status" value={job.status === "READY" ? "DRAFT" : "READY"} />
-              <Button type="submit" variant="outline" disabled={job.status === "READY" && Boolean(job.quotation)}>
-                {job.status === "READY" ? "Move back to draft" : "Mark ready"}
+            <h2 className="text-lg font-semibold">Requirement PDF</h2>
+            <p className="mt-2 text-sm text-muted">
+              {job.briefStatus === "SIGNED" && job.signedInAt
+                ? `Signed by ${job.signedInName} on ${shanghaiDate(job.signedInAt)}.`
+                : filled
+                  ? "The client has submitted the questionnaire."
+                  : "The PDF fills in as the client answers. It picks up the signature after they sign."}
+            </p>
+            <div className="mt-4">
+              <Button href={`/requirements/${job.id}/pdf`} variant="outline">
+                Download PDF
               </Button>
-            </form>
+            </div>
           </Card>
           <Card>
             <h2 className="text-lg font-semibold">Sign-in and NDA</h2>
             <p className="mt-2 text-sm text-muted">
               {job.signedInAt
                 ? `${job.signedInName} signed in at ${shanghaiDate(job.signedInAt)}.`
-                : "Nobody has signed in on the requirement link yet."}
+                : "The client has not signed the requirement yet."}
             </p>
             <p className="mt-2 text-sm text-muted">
               {job.nda?.status === "SIGNED"
                 ? `NDA ${job.nda.number} signed by ${job.nda.signerName}.`
                 : job.nda
                   ? `NDA ${job.nda.number} is offered. The client can sign it when they sign in.`
-                  : "No NDA yet. Offer one if the client should have the choice to sign it."}
+                  : "No NDA yet. Offer one if the client should be able to sign it with the requirement."}
             </p>
             {job.nda ? (
               <pre className="mt-4 whitespace-pre-wrap text-sm leading-6 text-foreground">{job.nda.body}</pre>
@@ -114,7 +124,7 @@ export default async function RequirementDetailPage({
           <div className="mt-4">
             <Button href={`/quotations/${job.quotation.id}`}>Open {job.quotation.number}</Button>
           </div>
-        ) : job.status === "READY" ? (
+        ) : filled ? (
           <div className="mt-4 flex flex-wrap gap-3">
             <form action={createQuotation}>
               <input type="hidden" name="requirementId" value={job.id} />
@@ -133,7 +143,34 @@ export default async function RequirementDetailPage({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-muted">Mark the requirement ready before starting a quotation.</p>
+          <p className="mt-3 text-sm text-muted">The client fills the questionnaire on the requirement link. A quotation opens after they submit.</p>
+        )}
+      </Card>
+      <Card className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Questionnaire</h2>
+          <Button href="/requirements/questions" variant="ghost">
+            Edit questions
+          </Button>
+        </div>
+        {review.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">No answers yet.</p>
+        ) : (
+          <div className="mt-6 grid gap-5">
+            {review.map((section) => (
+              <section key={section.id}>
+                <h3 className="font-semibold text-accent">{section.label}</h3>
+                <div className="mt-3 grid gap-3">
+                  {section.rows.map((row) => (
+                    <div key={row.label}>
+                      <p className="text-sm font-semibold">{row.label}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted">{row.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
         )}
       </Card>
     </>

@@ -40,6 +40,23 @@ enum NdaStatus {
   SIGNED
 }
 
+enum BriefStatus {
+  SENT
+  FILLED
+  SIGNED
+}
+
+enum AnswerKind {
+  SHORT
+  LONG
+  DROPDOWN
+  MULTI
+  URL
+  URLS
+  DATE
+  FILE
+}
+
 model CompanyProfile {
   id         String  @id
   publicName String
@@ -87,10 +104,58 @@ model Requirement {
   signedInName  String?
   signedInEmail String?
   signedInAt    DateTime?
+  briefStatus   BriefStatus       @default(SENT)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   quotation     Quotation?
   nda           Nda?
+  answers       RequirementAnswer[]
+  files         RequirementFile[]
+}
+
+model RequirementQuestion {
+  id           String     @id
+  section      String
+  sectionLabel String
+  sectionSort  Int
+  sort         Int
+  label        String
+  help         String     @default("")
+  kind         AnswerKind
+  options      String[]
+  types        String[]
+  required     Boolean    @default(false)
+  locked       Boolean    @default(false)
+  hidden       Boolean    @default(false)
+  dependsOn    String     @default("")
+  dependsValue String     @default("")
+  answers      RequirementAnswer[]
+  files        RequirementFile[]
+}
+
+model RequirementAnswer {
+  id            String              @id @default(cuid())
+  requirementId String
+  questionId    String
+  value         String              @db.Text
+  requirement   Requirement         @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  question      RequirementQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([requirementId, questionId])
+}
+
+model RequirementFile {
+  id            String              @id @default(cuid())
+  requirementId String
+  questionId    String
+  fileName      String
+  mime          String
+  bytes         Bytes
+  createdAt     DateTime            @default(now())
+  requirement   Requirement         @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  question      RequirementQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
 }
 
 model Quotation {

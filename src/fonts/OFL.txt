@@ -1,4 +1,5 @@
-Bundled fonts: Urbanist, Fugaz One, and a Noto Sans SC subset for the company legal name.
+Bundled fonts: Urbanist, Fugaz One, a Noto Sans SC subset for the company legal name, and Noto Sans SC (chinese-simplified) for requirement PDFs.
+Noto Sans SC is copyright Google and licensed under the SIL Open Font License.
 Urbanist copyright and the SIL Open Font License follow.
 
 Copyright 2021 The Urbanist Project Authors (https://github.com/coreyhu/Urbanist)

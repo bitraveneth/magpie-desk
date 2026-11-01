@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Banner, PageTitle } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
+import { Letterhead } from "@/components/desk/Letterhead";
 import { LineEditor } from "@/components/desk/LineEditor";
+import { quoteTemplates } from "@/content/company";
 import { companyPrefix, shanghaiStamp } from "@/lib/contract-number";
-import { createContract, setQuotationStatus, saveQuotation } from "@/lib/mutations";
-import { money, sumLines } from "@/lib/money";
+import { applyQuoteTemplate, createContract, setQuotationStatus, saveQuotation } from "@/lib/mutations";
+import { money, shanghaiDay, sumLines } from "@/lib/money";
 import { contractCompanyName, getCompany, getJobByQuotation } from "@/lib/queries";
 
 export default async function QuotationPage({
@@ -45,6 +47,30 @@ export default async function QuotationPage({
         </Badge>
       </div>
       <Card>
+        <Letterhead
+          documentName="Quotation"
+          number={quotation.number}
+          date={shanghaiDay(quotation.createdAt)}
+          client={job.clientCompany || job.clientName}
+          project={job.title}
+        />
+        {locked ? null : (
+          <div className="mt-6">
+            <p className="text-sm font-semibold">Start from a price card</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {quoteTemplates.map((template) => (
+                <form key={template.id} action={applyQuoteTemplate}>
+                  <input type="hidden" name="id" value={quotation.id} />
+                  <input type="hidden" name="templateId" value={template.id} />
+                  <Button type="submit" variant="ghost">
+                    {template.name} · USD {template.amount.toLocaleString("en-US")} / {template.cadence}
+                  </Button>
+                </form>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="mt-6">
         <LineEditor
           action={saveQuotation}
           quotationId={quotation.id}
@@ -58,6 +84,12 @@ export default async function QuotationPage({
           }))}
         />
         <p className="mt-6 text-lg font-semibold">Total {money(total, quotation.currency)}</p>
+        <div className="mt-4">
+          <Button href={`/quotations/${quotation.id}/pdf`} variant="outline">
+            Download PDF
+          </Button>
+        </div>
+        </div>
       </Card>
       <Card className="mt-6">
         {quotation.status === "DRAFT" ? (

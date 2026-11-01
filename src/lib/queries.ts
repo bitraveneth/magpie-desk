@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { company } from "@/content/company";
+import { questionBank } from "@/content/questions";
 import { prisma } from "@/lib/db";
 import { formatDocumentNumber, shortNumber, uniqueCode } from "@/lib/contract-number";
 import { ndaBody } from "@/lib/nda-text";
@@ -7,6 +8,11 @@ import { ndaBody } from "@/lib/nda-text";
 const jobInclude = {
   partner: true,
   nda: true,
+  answers: true,
+  files: {
+    select: { id: true, questionId: true, fileName: true, mime: true, createdAt: true },
+    orderBy: { createdAt: "asc" as const },
+  },
   quotation: {
     include: {
       lines: { orderBy: { sort: "asc" as const } },
@@ -28,7 +34,32 @@ export async function origin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
+let deskReady = false;
+let deskPromise: Promise<void> | null = null;
+let questionCache: Awaited<ReturnType<typeof prisma.requirementQuestion.findMany>> | null = null;
+let questionCachedAt = 0;
+
+export function invalidateQuestionCache() {
+  questionCache = null;
+  questionCachedAt = 0;
+}
+
 export async function ensureDesk() {
+  if (deskReady) return;
+  if (!deskPromise) {
+    deskPromise = loadDesk()
+      .then(() => {
+        deskReady = true;
+      })
+      .catch((error: unknown) => {
+        deskPromise = null;
+        throw error;
+      });
+  }
+  await deskPromise;
+}
+
+async function loadDesk() {
   await prisma.companyProfile.upsert({
     where: { id: "company" },
     update: {},
@@ -80,6 +111,63 @@ export async function ensureDesk() {
       where: { id: "company" },
       data: { seeded: true },
     });
+  });
+
+  await ensureQuestions();
+}
+
+async function ensureQuestions() {
+  const count = await prisma.requirementQuestion.count();
+  if (count >= questionBank.length) return;
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(8421102)`;
+    const current = await tx.requirementQuestion.count();
+    if (current >= questionBank.length) return;
+    for (const question of questionBank) {
+      await tx.requirementQuestion.upsert({
+        where: { id: question.id },
+        update: {},
+        create: {
+          id: question.id,
+          section: question.section,
+          sectionLabel: question.sectionLabel,
+          sort: question.sort,
+          sectionSort: question.sectionSort,
+          label: question.label,
+          help: question.help,
+          kind: question.kind,
+          options: question.options,
+          types: question.types,
+          required: question.required,
+          locked: question.locked,
+          dependsOn: question.dependsOn,
+          dependsValue: question.dependsValue,
+        },
+      });
+    }
+  });
+}
+
+export async function listQuestions() {
+  await ensureDesk();
+  if (questionCache && Date.now() - questionCachedAt < 30_000) return questionCache;
+  questionCache = await prisma.requirementQuestion.findMany({
+    orderBy: [{ sectionSort: "asc" }, { sort: "asc" }],
+  });
+  questionCachedAt = Date.now();
+  return questionCache;
+}
+
+export async function getPublicBrief(shareToken: string) {
+  await ensureDesk();
+  return prisma.requirement.findUnique({
+    where: { shareToken },
+    include: {
+      answers: true,
+      files: { select: { id: true, questionId: true, fileName: true } },
+      nda: true,
+      quotation: { select: { id: true } },
+    },
   });
 }
 

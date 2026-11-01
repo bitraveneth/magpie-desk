@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Banner, PageTitle } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
-import { company } from "@/content/company";
+import { Letterhead } from "@/components/desk/Letterhead";
 import { issueInvoice, markInvoicePaid, setPaymentMethod } from "@/lib/mutations";
-import { money, shanghaiDate, sumLines } from "@/lib/money";
+import { money, shanghaiDate, shanghaiDay, sumLines } from "@/lib/money";
 import { getJobByInvoice, getPayments } from "@/lib/queries";
 
 export default async function InvoicePage({
@@ -44,8 +44,13 @@ export default async function InvoicePage({
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card>
-          <p className="legal-zh text-sm text-muted">{company.nameZh}</p>
-          <p className="mt-1 text-sm text-muted">{company.nameEn}</p>
+          <Letterhead
+            documentName="Invoice"
+            number={invoice.number}
+            date={shanghaiDay(invoice.issuedAt ?? invoice.createdAt)}
+            client={job.clientCompany || job.clientName}
+            project={job.title}
+          />
           <div className="mt-6 overflow-x-auto">
             <table className="w-full min-w-[32rem] text-left text-sm">
               <thead className="text-muted">
@@ -67,6 +72,11 @@ export default async function InvoicePage({
             </table>
           </div>
           <p className="mt-4 text-lg font-semibold">Total {money(total, invoice.currency)}</p>
+          <div className="mt-4">
+            <Button href={`/invoices/${invoice.id}/pdf`} variant="outline">
+              Download PDF
+            </Button>
+          </div>
         </Card>
         <div className="grid gap-6">
           <Card>

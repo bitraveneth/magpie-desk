@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { PageTitle } from "@/components/desk/DeskShell";
 import { company } from "@/content/company";
+import { briefLabel } from "@/lib/brief";
 import { listPartners, listRequirements } from "@/lib/queries";
 import { money } from "@/lib/money";
 import { commissionTotals } from "@/lib/commission";
@@ -10,7 +11,7 @@ export default async function HomePage() {
   const [jobs, partners] = await Promise.all([listRequirements(), listPartners()]);
   const counts = [
     ["Requirements", jobs.length],
-    ["Ready", jobs.filter((job) => job.status === "READY").length],
+    ["Filled", jobs.filter((job) => job.briefStatus !== "SENT").length],
     ["Signed contracts", jobs.filter((job) => job.quotation?.contract?.status === "SIGNED").length],
     ["Paid invoices", jobs.filter((job) => job.quotation?.contract?.invoice?.status === "PAID").length],
   ] as const;
@@ -34,9 +35,14 @@ export default async function HomePage() {
         <Card>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">Recent requirements</h2>
-            <Link href="/requirements/new" className="text-sm font-semibold text-accent">
-              New requirement
-            </Link>
+            <span className="flex gap-4">
+              <Link href="/requirements/questions" className="text-sm font-semibold text-accent">
+                Questions
+              </Link>
+              <Link href="/requirements/new" className="text-sm font-semibold text-accent">
+                New requirement
+              </Link>
+            </span>
           </div>
           <ul className="grid gap-3">
             {jobs.slice(0, 6).map((job) => (
@@ -50,7 +56,7 @@ export default async function HomePage() {
                     {job.sample ? " · Sample" : ""}
                   </p>
                 </div>
-                <span className="text-sm text-muted">{job.status === "READY" ? "Ready" : "Draft"}</span>
+                <span className="text-sm text-muted">{briefLabel(job.briefStatus)}</span>
               </li>
             ))}
           </ul>

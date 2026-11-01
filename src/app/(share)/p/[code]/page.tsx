@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { Banner, Field, PageTitle, SampleNote } from "@/components/desk/DeskShell";
+import { Banner, DeskShell, Field, PageTitle, SampleNote } from "@/components/desk/DeskShell";
 import { company } from "@/content/company";
 import { createRequirement } from "@/lib/mutations";
 import { getPartnerByCode } from "@/lib/queries";
@@ -21,7 +21,7 @@ export default async function PartnerLinkPage({
   if (!partner) notFound();
 
   return (
-    <>
+    <DeskShell publicMode>
       <PageTitle
         kicker="Partner link"
         title={`Start a requirement with ${partner.name}`}
@@ -51,6 +51,6 @@ export default async function PartnerLinkPage({
         </form>
         <p className="mt-4 text-sm text-muted">{company.nameEn}</p>
       </Card>
-    </>
+    </DeskShell>
   );
 }

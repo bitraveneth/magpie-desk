@@ -48,3 +48,18 @@ body {
 .legal-zh {
   font-family: var(--font-noto-sc), "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
 }
+
+@keyframes question-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.question-rise {
+  animation: question-rise 240ms ease;
+}

@@ -140,7 +140,9 @@ export async function createQuotation(formData: FormData) {
     include: { quotation: true },
   });
   if (!job) fail("/requirements", "Requirement not found.");
-  if (job.status !== "READY") fail(`/requirements/${job.id}`, "Mark the requirement ready before a quotation.");
+  if (job.briefStatus === "SENT") {
+    fail(`/requirements/${job.id}`, "The client has to fill the requirement before a quotation.");
+  }
   if (job.quotation) fail(`/quotations/${job.quotation.id}`, "This requirement already has a quotation.");
 
   const template = quoteTemplates.find((item) => item.id === templateId);
@@ -201,6 +203,34 @@ export async function saveQuotation(formData: FormData) {
     }),
   ]);
   done(`/quotations/${id}`, "Quotation saved.");
+}
+
+export async function applyQuoteTemplate(formData: FormData) {
+  const id = text(formData, "id");
+  const template = quoteTemplates.find((item) => item.id === text(formData, "templateId"));
+  const quotation = await prisma.quotation.findUnique({ where: { id } });
+  if (!quotation) fail("/requirements", "Quotation not found.");
+  if (!template) fail(`/quotations/${id}`, "Choose a price card.");
+  if (quotation.status !== "DRAFT") fail(`/quotations/${id}`, "Accepted quotations stay locked.");
+
+  await prisma.$transaction([
+    prisma.quotationLine.deleteMany({ where: { quotationId: id } }),
+    prisma.quotation.update({
+      where: { id },
+      data: {
+        currency: "USD",
+        lines: {
+          create: {
+            description: `${template.name} — ${template.detail}`,
+            quantity: 1,
+            unitAmount: template.amount,
+            sort: 0,
+          },
+        },
+      },
+    }),
+  ]);
+  done(`/quotations/${id}`, `${template.name} lines replaced the quotation.`);
 }
 
 export async function setQuotationStatus(formData: FormData) {

@@ -5,6 +5,7 @@ import { logout } from "@/lib/auth-actions";
 
 const links = [
   { href: "/requirements", label: "Requirements" },
+  { href: "/requirements/questions", label: "Questions" },
   { href: "/partners", label: "Partners" },
   { href: "/settings/payments", label: "Payments" },
 ];

@@ -5,9 +5,9 @@ import { Card } from "@/components/ui/Card";
 import { Textarea } from "@/components/ui/Textarea";
 import { Banner, PageTitle } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
-import { company } from "@/content/company";
+import { Letterhead } from "@/components/desk/Letterhead";
 import { createInvoice, saveContract, signContract } from "@/lib/mutations";
-import { shanghaiDate } from "@/lib/money";
+import { shanghaiDate, shanghaiDay } from "@/lib/money";
 import { getJobByContract } from "@/lib/queries";
 
 export default async function ContractPage({
@@ -44,8 +44,13 @@ export default async function ContractPage({
         {signed && contract.signedAt ? <Badge>Signed {shanghaiDate(contract.signedAt)}</Badge> : null}
       </div>
       <Card>
-        <p className="legal-zh text-sm text-muted">{company.nameZh}</p>
-        <p className="mt-1 text-sm text-muted">{company.nameEn}</p>
+        <Letterhead
+          documentName="Contract"
+          number={contract.number}
+          date={shanghaiDay(contract.signedAt ?? contract.createdAt)}
+          client={job.clientCompany || job.clientName}
+          project={job.title}
+        />
         {signed ? (
           <pre className="mt-6 whitespace-pre-wrap text-sm leading-7">{contract.body}</pre>
         ) : (

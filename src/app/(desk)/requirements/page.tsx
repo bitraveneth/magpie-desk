@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Banner, PageTitle, SampleNote } from "@/components/desk/DeskShell";
+import { briefLabel } from "@/lib/brief";
 import { listRequirements } from "@/lib/queries";
 
 export default async function RequirementsPage({
@@ -17,8 +18,11 @@ export default async function RequirementsPage({
     <>
       <PageTitle kicker="Requirements" title="Briefs" text="A requirement can be sent on its own link. A partner is optional." />
       <Banner error={messages.error} notice={messages.notice} />
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-3">
         <Button href="/requirements/new">New requirement</Button>
+        <Button href="/requirements/questions" variant="outline">
+          Edit questions
+        </Button>
       </div>
       <div className="grid gap-4">
         {jobs.map((job) => (
@@ -26,7 +30,7 @@ export default async function RequirementsPage({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="mb-2 flex flex-wrap gap-2">
-                  <Badge>{job.status === "READY" ? "Ready" : "Draft"}</Badge>
+                  <Badge>{briefLabel(job.briefStatus)}</Badge>
                   <SampleNote sample={job.sample} />
                   {job.partner ? <Badge>Partner: {job.partner.name}</Badge> : null}
                   {job.nda?.status === "SIGNED" ? <Badge>NDA signed</Badge> : null}
