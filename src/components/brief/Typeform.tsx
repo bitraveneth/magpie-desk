@@ -22,7 +22,12 @@ type BriefFile = { id: string; questionId: string; fileName: string };
 type Phase = "welcome" | "questions" | "sign" | "done";
 
 const fieldClass =
-  "w-full border-0 border-b-2 border-foreground/15 bg-transparent py-3 text-2xl text-foreground outline-none placeholder:text-muted/70 focus:border-accent";
+  "w-full rounded-2xl border border-border bg-background px-4 py-3.5 text-base text-foreground outline-none transition placeholder:text-muted/70 focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/15";
+
+const primaryBtn =
+  "inline-flex h-12 items-center justify-center rounded-full bg-accent px-6 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition hover:bg-accent-strong disabled:opacity-60";
+
+const ghostBtn = "inline-flex h-12 items-center justify-center rounded-full px-3 text-sm font-semibold text-muted transition hover:text-foreground";
 
 export function Typeform({
   token,
@@ -183,145 +188,146 @@ export function Typeform({
     setPhase("done");
   }
 
+  const started = Object.values(values).some((value) => value.trim());
+
+  function begin() {
+    const answers = new Map(Object.entries(values));
+    const ordered = [...questions]
+      .filter((item) => questionVisible(item, answers))
+      .sort((left, right) => left.sectionSort - right.sectionSort || left.sort - right.sort);
+    const resume = ordered.findIndex((item) => item.required && item.kind !== "FILE" && answerBlank(item.kind, values[item.id] ?? ""));
+    setIndex(resume >= 0 ? resume : 0);
+    setPhase("questions");
+  }
+
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground" onKeyDown={onKeyDown}>
-      <div className="h-1.5 bg-border">
-        <div className="h-full bg-accent transition-all duration-300" style={{ width: `${progress}%` }} />
-      </div>
-      <header className="flex items-center justify-between gap-3 px-5 py-4 sm:px-8">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/magpie-logo-purple.png" alt="Magpie Studio" className="h-8 w-auto" />
-        <p className="text-sm font-medium text-muted">
-          {phase === "questions" && question ? `${step + 1} of ${list.length}` : saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : "No login needed"}
-        </p>
-      </header>
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 pb-32 sm:px-8">
-        {phase === "welcome" ? (
-          <section className="question-rise flex flex-1 flex-col justify-center">
-            <p className="text-sm font-semibold text-accent">Magpie Studio</p>
-            <h1 className="mt-3 text-4xl font-semibold leading-tight sm:text-6xl">{title}</h1>
-            <p className="mt-5 max-w-xl text-lg leading-8 text-muted">
-              This link is public. Anyone with it can answer. There is no account. One question at a time, and you can leave and come back.
-            </p>
-          </section>
-        ) : null}
-        {phase === "questions" && question ? (
-          <section key={question.id} className="question-rise flex flex-1 flex-col justify-center py-6">
-            <p className="text-sm font-semibold text-accent">{question.sectionLabel}</p>
-            <h1 className="mt-3 text-3xl font-semibold leading-tight sm:text-5xl">
-              {question.label}
-              {question.required ? <span className="ml-1 text-accent">*</span> : null}
-            </h1>
-            {question.help ? <p className="mt-4 text-base leading-7 text-muted sm:text-lg">{question.help}</p> : null}
-            <div className="mt-8">{renderQuestion(question)}</div>
-            {error ? <p className="mt-4 text-sm font-semibold text-accent-strong">{error}</p> : null}
-            {question.kind !== "DROPDOWN" ? (
-              <p className="mt-6 hidden text-sm text-muted sm:block">
-                {question.kind === "LONG" ? "Press OK when you are ready." : "Press Enter"}
-              </p>
-            ) : null}
-          </section>
-        ) : null}
-        {phase === "sign" ? (
-          <section className="question-rise flex flex-1 flex-col justify-center py-6">
-            <p className="text-sm font-semibold text-accent">Sign</p>
-            <h1 className="mt-3 text-3xl font-semibold leading-tight sm:text-5xl">Sign this requirement</h1>
-            <p className="mt-4 text-base leading-7 text-muted sm:text-lg">Your name and email go on the PDF, with the date in Shanghai.</p>
-            <div className="mt-8 grid gap-6">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Name</span>
-                <input className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Email</span>
-                <input className={fieldClass} type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
-              </label>
-              <button
-                type="button"
-                onClick={() => setWantNda((current) => !current)}
-                className={`rounded-2xl border px-4 py-4 text-left text-base ${wantNda ? "border-accent bg-accent/10" : "border-border bg-card"}`}
-              >
-                <span className="font-semibold">Also sign the NDA</span>
-                <span className="mt-1 block text-sm text-muted">Optional. Leave it off to sign only the requirement.</span>
-              </button>
-              {wantNda ? <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-2xl border border-border bg-card p-4 text-sm leading-6">{ndaText}</pre> : null}
+    <div className="brief-stage flex min-h-dvh flex-col text-foreground" onKeyDown={onKeyDown}>
+      <div className="brief-frame">
+        <header className="mb-5 flex flex-col items-center gap-3 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/magpie-logo-purple.png" alt="Magpie Studio" className="h-9 w-auto" />
+          <p className="text-xs font-semibold tracking-wide text-muted">
+            {phase === "questions" && question
+              ? `Question ${step + 1} of ${list.length}`
+              : saveState === "saving"
+                ? "Saving…"
+                : saveState === "saved"
+                  ? "Saved"
+                  : "Public link · no login"}
+          </p>
+        </header>
+        <div className="brief-sheet question-rise" key={phase === "questions" ? question?.id : phase}>
+          {phase === "welcome" ? null : (
+            <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-background">
+              <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${progress}%` }} />
             </div>
-            {error ? <p className="mt-4 text-sm font-semibold text-accent-strong">{error}</p> : null}
-          </section>
-        ) : null}
-        {phase === "done" ? (
-          <section className="question-rise flex flex-1 flex-col justify-center">
-            <p className="text-sm font-semibold text-accent">Signed</p>
-            <h1 className="mt-3 text-4xl font-semibold leading-tight sm:text-6xl">Thank you.</h1>
-            <p className="mt-5 text-lg leading-8 text-muted">
-              {signerName || name} signed this requirement{signedLabel ? ` on ${signedLabel}` : ""}.
-              {ndaDone ? " The NDA is signed too." : ""}
-            </p>
-            <a
-              href={`/r/${token}/pdf`}
-              className="mt-8 inline-flex h-14 items-center justify-center rounded-full bg-accent px-8 text-base font-semibold text-white"
-            >
-              Download PDF
-            </a>
-          </section>
-        ) : null}
-      </main>
-      <footer className="sticky bottom-0 border-t border-border bg-background/95 px-5 py-3 backdrop-blur sm:px-8" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-        <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
-          {phase === "questions" && step > 0 ? (
-            <button type="button" className="h-12 rounded-full px-4 text-sm font-semibold text-muted" onClick={() => { setError(""); setIndex(step - 1); }}>
-              Back
-            </button>
-          ) : phase === "sign" && !locked ? (
-            <button
-              type="button"
-              className="h-12 rounded-full px-4 text-sm font-semibold text-muted"
-              onClick={() => {
-                void reopenBriefNow(token).then((result) => {
-                  if (!result.ok) setError(result.error);
-                  else {
-                    setPhase("questions");
-                    setIndex(0);
-                  }
-                });
-              }}
-            >
-              Edit answers
-            </button>
-          ) : (
-            <span />
           )}
           {phase === "welcome" ? (
-            <button
-              type="button"
-              className="ml-auto h-12 rounded-full bg-accent px-8 text-sm font-semibold text-white"
-              onClick={() => {
-                const answers = new Map(Object.entries(values));
-                const ordered = [...questions]
-                  .filter((item) => questionVisible(item, answers))
-                  .sort((left, right) => left.sectionSort - right.sectionSort || left.sort - right.sort);
-                const resume = ordered.findIndex(
-                  (item) => item.required && item.kind !== "FILE" && answerBlank(item.kind, values[item.id] ?? ""),
-                );
-                setIndex(resume >= 0 ? resume : 0);
-                setPhase("questions");
-              }}
-            >
-              {Object.values(values).some((value) => value.trim()) ? "Continue" : "Start"}
-            </button>
+            <section className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Magpie Studio</p>
+              <h1 className="mt-3 text-3xl font-semibold leading-tight">Your project brief</h1>
+              {title ? <p className="mt-4 text-sm font-semibold text-foreground">{title}</p> : null}
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-muted">
+                One question at a time. Anyone with this link can answer. There is no account, and you can leave and come back.
+              </p>
+              <button type="button" className={`${primaryBtn} mt-8 w-full`} onClick={begin}>
+                {started ? "Continue" : "Start"}
+              </button>
+            </section>
           ) : null}
           {phase === "questions" && question ? (
-            <button type="button" disabled={busy} className="ml-auto h-12 rounded-full bg-accent px-8 text-sm font-semibold text-white disabled:opacity-60" onClick={() => goNext()}>
-              {busy ? "Saving…" : step >= list.length - 1 ? "Submit" : "OK"}
-            </button>
+            <section className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">{question.sectionLabel}</p>
+              <h1 className="mt-3 text-2xl font-semibold leading-snug sm:text-3xl">
+                {question.label}
+                {question.required ? <span className="text-accent"> *</span> : null}
+              </h1>
+              {question.help ? <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">{question.help}</p> : null}
+              <div className="mt-6 text-left">{renderQuestion(question)}</div>
+              {error ? <p className="mt-4 text-sm font-semibold text-accent-strong">{error}</p> : null}
+              <div className="mt-6 flex items-center gap-2">
+                {step > 0 ? (
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    onClick={() => {
+                      setError("");
+                      setIndex(step - 1);
+                    }}
+                  >
+                    Back
+                  </button>
+                ) : null}
+                <button type="button" disabled={busy} className={`${primaryBtn} min-w-0 flex-1`} onClick={() => goNext()}>
+                  {busy ? "Saving…" : step >= list.length - 1 ? "Submit" : "OK"}
+                </button>
+              </div>
+            </section>
           ) : null}
           {phase === "sign" ? (
-            <button type="button" disabled={busy} className="ml-auto h-12 rounded-full bg-accent px-8 text-sm font-semibold text-white disabled:opacity-60" onClick={() => void onSign()}>
-              {busy ? "Signing…" : "Sign"}
-            </button>
+            <section className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Sign</p>
+              <h1 className="mt-3 text-2xl font-semibold leading-snug sm:text-3xl">Sign this requirement</h1>
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">Your name and email go on the PDF, with the date in Shanghai.</p>
+              <div className="mt-6 grid gap-4 text-left">
+                <label className="block">
+                  <span className="mb-2 block text-center text-sm font-semibold">Name</span>
+                  <input className={`${fieldClass} text-center`} value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-center text-sm font-semibold">Email</span>
+                  <input className={`${fieldClass} text-center`} type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setWantNda((current) => !current)}
+                  className={`rounded-2xl border px-4 py-4 text-left text-sm ${wantNda ? "border-accent bg-accent text-white" : "border-border bg-background"}`}
+                >
+                  <span className="font-semibold">Also sign the NDA</span>
+                  <span className={`mt-1 block ${wantNda ? "text-white/80" : "text-muted"}`}>Optional. Leave it off to sign only the requirement.</span>
+                </button>
+                {wantNda ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-2xl border border-border bg-background p-4 text-left text-xs leading-5">{ndaText}</pre> : null}
+              </div>
+              {error ? <p className="mt-4 text-sm font-semibold text-accent-strong">{error}</p> : null}
+              <div className="mt-6 flex items-center gap-2">
+                {!locked ? (
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    onClick={() => {
+                      void reopenBriefNow(token).then((result) => {
+                        if (!result.ok) setError(result.error);
+                        else {
+                          setPhase("questions");
+                          setIndex(0);
+                        }
+                      });
+                    }}
+                  >
+                    Edit
+                  </button>
+                ) : null}
+                <button type="button" disabled={busy} className={`${primaryBtn} min-w-0 flex-1`} onClick={() => void onSign()}>
+                  {busy ? "Signing…" : "Sign"}
+                </button>
+              </div>
+            </section>
+          ) : null}
+          {phase === "done" ? (
+            <section className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Signed</p>
+              <h1 className="mt-3 text-3xl font-semibold leading-tight">Thank you</h1>
+              <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-muted">
+                {signerName || name} signed this requirement{signedLabel ? ` on ${signedLabel}` : ""}.
+                {ndaDone ? " The NDA is signed too." : ""}
+              </p>
+              <a href={`/r/${token}/pdf`} className={`${primaryBtn} mt-8 w-full`}>
+                Download PDF
+              </a>
+            </section>
           ) : null}
         </div>
-      </footer>
+      </div>
     </div>
   );
 
@@ -337,7 +343,13 @@ export function Typeform({
   function renderQuestion(item: BriefQuestion) {
     const value = values[item.id] ?? "";
     if (item.kind === "LONG") {
-      return <textarea className="min-h-36 w-full rounded-2xl border border-border bg-card p-4 text-lg leading-7 outline-none focus:border-accent" value={value} onChange={(event) => update(item.id, event.target.value)} />;
+      return (
+        <textarea
+          className="min-h-36 w-full rounded-2xl border border-border bg-background p-4 text-base leading-7 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/15"
+          value={value}
+          onChange={(event) => update(item.id, event.target.value)}
+        />
+      );
     }
     if (item.kind === "SHORT" || item.kind === "URL") {
       return (
@@ -368,9 +380,9 @@ export function Typeform({
                   update(item.id, option);
                   window.setTimeout(() => goNext(option), 180);
                 }}
-                className={`flex min-h-14 items-center gap-4 rounded-2xl border px-4 py-3 text-left text-lg ${selected ? "border-accent bg-accent/10" : "border-border bg-card"}`}
+                className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left text-base transition ${selected ? "border-accent bg-accent text-white shadow-md shadow-accent/20" : "border-transparent bg-background text-foreground hover:border-accent/30"}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold ${selected ? "border-accent text-accent" : "border-border text-muted"}`}>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${selected ? "bg-white/20 text-white" : "bg-white text-muted"}`}>
                   {optionIndex < 26 ? String.fromCharCode(65 + optionIndex) : optionIndex + 1}
                 </span>
                 {option}
@@ -394,9 +406,9 @@ export function Typeform({
                   const next = on ? selected.filter((itemOption) => itemOption !== option) : [...selected, option];
                   update(item.id, JSON.stringify(next));
                 }}
-                className={`flex min-h-14 items-center gap-4 rounded-2xl border px-4 py-3 text-left text-lg ${on ? "border-accent bg-accent/10" : "border-border bg-card"}`}
+                className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left text-base transition ${on ? "border-accent bg-accent text-white shadow-md shadow-accent/20" : "border-transparent bg-background text-foreground hover:border-accent/30"}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold ${on ? "border-accent text-accent" : "border-border text-muted"}`}>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${on ? "bg-white/20 text-white" : "bg-white text-muted"}`}>
                   {optionIndex < 26 ? String.fromCharCode(65 + optionIndex) : optionIndex + 1}
                 </span>
                 {option}
@@ -413,7 +425,7 @@ export function Typeform({
           {rows.map((row, rowIndex) => (
             <div key={rowIndex} className="grid gap-2">
               <input
-                className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-base outline-none focus:border-accent"
+                className={fieldClass}
                 type="url"
                 placeholder="https://"
                 value={row.url}
@@ -424,7 +436,7 @@ export function Typeform({
                 }}
               />
               <input
-                className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-base outline-none focus:border-accent"
+                className={fieldClass}
                 placeholder="What you like"
                 value={row.note}
                 onChange={(event) => {
@@ -442,7 +454,7 @@ export function Typeform({
     return (
       <div className="grid gap-3">
         {ownFiles.map((file) => (
-          <div key={file.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+          <div key={file.id} className="flex items-center justify-between gap-3 rounded-2xl bg-background px-4 py-3">
             <span className="text-base">{file.fileName}</span>
             <button
               type="button"
@@ -458,7 +470,7 @@ export function Typeform({
             </button>
           </div>
         ))}
-        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-accent/40 bg-card px-4 py-6 text-center">
+        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-accent/40 bg-background px-4 py-6 text-center">
           <span className="text-base font-semibold">Upload a file</span>
           <span className="mt-1 text-sm text-muted">PDF, Word, PNG, JPEG, or WebP. Up to 8 MB.</span>
           <input
