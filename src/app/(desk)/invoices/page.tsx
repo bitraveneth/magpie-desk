@@ -27,7 +27,7 @@ export default async function InvoicesPage({
 
   return (
     <>
-      <PageTitle kicker="Invoices" title="Invoices" text="Create as many as you need. Each one is desk paperwork, with its own lines and your company bank details." />
+      <PageTitle kicker="Invoices" title="Invoices" text="Create as many as you need. Each sheet has line discounts, a savings total, and your company bank details." />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {purposes.map(([value, label]) => {

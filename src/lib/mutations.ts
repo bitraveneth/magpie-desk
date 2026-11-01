@@ -418,11 +418,13 @@ function invoiceLines(formData: FormData) {
   const descriptions = formData.getAll("description").map((value) => String(value).trim());
   const quantities = formData.getAll("quantity").map((value) => Number(value));
   const amounts = formData.getAll("unitAmount").map((value) => Number(value));
+  const discounts = formData.getAll("discountRate").map((value) => Number(value));
   return descriptions
     .map((description, index) => ({
       description,
       quantity: quantities[index],
       unitAmount: amounts[index],
+      discountRate: Math.min(100, Math.max(0, Number.isFinite(discounts[index]) ? discounts[index] : 0)),
       sort: index,
     }))
     .filter((line) => line.description);
@@ -503,6 +505,9 @@ export async function saveInvoice(formData: FormData) {
   if (lines.some((line) => !Number.isFinite(line.unitAmount) || line.unitAmount < 0)) {
     fail(`/invoices/${id}`, "Amounts cannot be negative.");
   }
+  if (lines.some((line) => line.discountRate < 0 || line.discountRate > 100)) {
+    fail(`/invoices/${id}`, "Discount is a percent from 0 to 100.");
+  }
 
   await prisma.invoiceLine.deleteMany({ where: { invoiceId: id } });
   await prisma.invoice.update({
@@ -529,7 +534,7 @@ export async function setPaymentMethod(formData: FormData) {
     fail(`/invoices/${id}`, "Choose the company QR or the bank slip.");
   }
   await prisma.invoice.update({ where: { id }, data: { paymentMethod: method } });
-  done(`/invoices/${id}`, method === "COMPANY_QR" ? "Invoice will show the company QR." : "Invoice will show the bank slip.");
+  done(`/invoices/${id}`, method === "COMPANY_QR" ? "Invoice will show the company QR." : "Bank details stay on the invoice. The QR is hidden.");
 }
 
 export async function issueInvoice(formData: FormData) {

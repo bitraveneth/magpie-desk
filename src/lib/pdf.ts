@@ -237,7 +237,7 @@ async function startPdf(party: PdfParty, documentName: string, number: string, c
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   let cjk: PDFFont | null = null;
   try {
-    const bytes = await readFile(path.join(process.cwd(), "src/fonts/noto-sans-sc-pdf.woff2"));
+    const bytes = await readFile(path.join(process.cwd(), "src/fonts/wqy-microhei.ttf"));
     cjk = await doc.embedFont(bytes, { subset: true });
   } catch {
     cjk = null;
@@ -323,6 +323,222 @@ export async function buildRequirementPdf(input: RequirementPdfInput): Promise<U
     drawWrapped(pen, input.signature.email, 10, ink, false, 3);
     drawWrapped(pen, input.signature.date, 10, muted, false, 3);
   }
+  return finish(pen);
+}
+
+export type InvoicePdfInput = {
+  party: PdfParty;
+  number: string;
+  date: string;
+  purpose: string;
+  title: string;
+  clientName: string;
+  clientCompany: string;
+  currency: string;
+  lines: { description: string; quantity: string; unit: string; discount: string; amount: string }[];
+  subtotal: string;
+  discount: string;
+  saved: boolean;
+  total: string;
+  seller: { label: string; value: string }[];
+  note: string;
+  image?: { bytes: Uint8Array; mime: string } | null;
+};
+
+export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.setTitle(`${input.party.publicName} Invoice ${input.number}`);
+  doc.setAuthor(input.party.nameEn);
+  doc.registerFontkit((await loadFontkit()) as Parameters<PDFDocument["registerFontkit"]>[0]);
+  const latin = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  let cjk: PDFFont | null = null;
+  try {
+    // WenQuanYi Micro Hei (Apache 2.0). A hairline Noto cut disappears when the PDF is printed.
+    cjk = await doc.embedFont(await readFile(path.join(process.cwd(), "src/fonts/wqy-microhei.ttf")), { subset: true });
+  } catch {
+    cjk = null;
+  }
+  let logo: PDFImage | null = null;
+  try {
+    logo = await doc.embedPng(await readFile(path.join(process.cwd(), "public/brand/magpie-logo-purple.png")));
+  } catch {
+    logo = null;
+  }
+  const brand = rgb(0.361, 0.176, 0.569);
+  const cream = rgb(0.965, 0.949, 0.918);
+  const white = rgb(1, 1, 1);
+  const page = doc.addPage([pageWidth, pageHeight]);
+  const pen: Pen = { doc, page, y: pageHeight - 156, latin, bold, cjk };
+  const right = pageWidth - margin;
+  page.drawRectangle({ x: 0, y: pageHeight - 148, width: pageWidth, height: 148, color: cream });
+  page.drawRectangle({ x: 0, y: pageHeight - 154, width: pageWidth, height: 6, color: brand });
+  if (logo) {
+    const height = 86;
+    const width = (logo.width / logo.height) * height;
+    page.drawImage(logo, { x: margin, y: pageHeight - 32 - height, width, height });
+  }
+  const drawRight = (text: string, y: number, size: number, font: PDFFont, color: RGB) => {
+    drawAt(page, text, right - widthOf(text, size, font, cjk), y, size, font, cjk, color);
+  };
+  drawRight("INVOICE", pageHeight - 52, 22, bold, brand);
+  drawRight(input.number, pageHeight - 74, 11, bold, ink);
+  drawRight(input.date, pageHeight - 90, 10, latin, muted);
+
+  const sellerValue = (label: string) => input.seller.find((item) => item.label === label)?.value ?? "";
+  const billX = margin + 270;
+  const columnWidth = 230;
+
+  function stack(lines: string[], x: number, y: number, size: number, font: PDFFont, color: RGB) {
+    let cursor = y;
+    for (const source of lines) {
+      if (!source.trim()) continue;
+      for (const line of wrapParagraph(source, size, columnWidth, font, cjk)) {
+        drawAt(page, line, x, cursor, size, font, cjk, color);
+        cursor -= size + 3;
+      }
+      cursor -= 2;
+    }
+    return cursor;
+  }
+
+  drawAt(page, "FROM", margin, pen.y, 8, bold, cjk, muted);
+  drawAt(page, "BILL TO", billX, pen.y, 8, bold, cjk, muted);
+  const addressLines = sellerValue("Address")
+    .split(/\n+/)
+    .flatMap((line) => (line.length > 24 && line.includes(" ") ? line.split(/\s+/).filter(Boolean) : [line]));
+  const fromBottom = stack(
+    [
+      sellerValue("Company") || input.party.nameZh,
+      input.party.nameEn,
+      sellerValue("Tax number") ? `Tax number  ${sellerValue("Tax number")}` : "",
+      ...addressLines,
+      sellerValue("Phone") ? `Phone  ${sellerValue("Phone")}` : "",
+      input.party.email,
+    ],
+    margin,
+    pen.y - 16,
+    9,
+    latin,
+    ink,
+  );
+  const billBottom = stack(
+    [
+      input.clientCompany || input.clientName || "Client",
+      input.clientCompany && input.clientName ? input.clientName : "",
+      input.purpose,
+      input.title,
+    ],
+    billX,
+    pen.y - 16,
+    10,
+    latin,
+    ink,
+  );
+  pen.y = Math.min(fromBottom, billBottom) - 14;
+
+  const descX = margin + 6;
+  const descWidth = 200;
+  const qtyX = margin + 214;
+  const unitRight = margin + 338;
+  const discountX = margin + 350;
+  const amountRight = right - 6;
+
+  function room(height: number) {
+    if (pen.y - height >= margin + 24) return;
+    pen.page = pen.doc.addPage([pageWidth, pageHeight]);
+    pen.y = pageHeight - margin;
+    drawAt(pen.page, input.number, margin, pen.y - 10, 9, latin, cjk, muted);
+    pen.y -= 26;
+  }
+
+  function tableHeader() {
+    room(28);
+    pen.page.drawRectangle({ x: margin, y: pen.y - 18, width: pageWidth - margin * 2, height: 22, color: brand });
+    const size = 8;
+    const baseline = pen.y - 13;
+    drawAt(pen.page, "DESCRIPTION", descX, baseline, size, bold, cjk, white);
+    drawAt(pen.page, "QTY", qtyX, baseline, size, bold, cjk, white);
+    drawAt(pen.page, "UNIT", unitRight - widthOf("UNIT", size, bold, cjk), baseline, size, bold, cjk, white);
+    drawAt(pen.page, "DISCOUNT", discountX, baseline, size, bold, cjk, white);
+    drawAt(pen.page, "AMOUNT", amountRight - widthOf("AMOUNT", size, bold, cjk), baseline, size, bold, cjk, white);
+    pen.y -= 26;
+  }
+
+  tableHeader();
+  input.lines.forEach((line, index) => {
+    const wrapped = wrapParagraph(line.description, 9, descWidth, latin, cjk);
+    const height = Math.max(22, wrapped.length * 12 + 8);
+    const pageBefore = pen.page;
+    room(height + 4);
+    if (pen.page !== pageBefore) tableHeader();
+    if (index % 2 === 1) {
+      pen.page.drawRectangle({ x: margin, y: pen.y - height + 4, width: pageWidth - margin * 2, height: height - 2, color: cream });
+    }
+    wrapped.forEach((text, lineIndex) => drawAt(pen.page, text, descX, pen.y - 12 - lineIndex * 12, 9, latin, cjk, ink));
+    drawAt(pen.page, line.quantity, qtyX, pen.y - 12, 9, latin, cjk, ink);
+    drawAt(pen.page, line.unit, unitRight - widthOf(line.unit, 9, latin, cjk), pen.y - 12, 9, latin, cjk, ink);
+    drawAt(pen.page, line.discount, discountX, pen.y - 12, 9, line.discount === "0%" ? latin : bold, cjk, line.discount === "0%" ? muted : brand);
+    drawAt(pen.page, line.amount, amountRight - widthOf(line.amount, 9, bold, cjk), pen.y - 12, 9, bold, cjk, ink);
+    pen.y -= height;
+  });
+
+  pen.y -= 12;
+  const totalRows: { label: string; value: string; strong?: boolean; save?: boolean }[] = [
+    { label: "Subtotal", value: input.subtotal },
+    { label: "Discount", value: `- ${input.discount}` },
+  ];
+  if (input.saved) totalRows.push({ label: "You save", value: input.discount, save: true });
+  totalRows.push({ label: "Total", value: input.total, strong: true });
+  const boxWidth = 230;
+  const boxHeight = 12 + totalRows.length * 18;
+  room(boxHeight + 8);
+  pen.page.drawRectangle({
+    x: right - boxWidth,
+    y: pen.y - boxHeight,
+    width: boxWidth,
+    height: boxHeight,
+    color: cream,
+    borderColor: brand,
+    borderWidth: 1,
+  });
+  let rowY = pen.y - 16;
+  for (const row of totalRows) {
+    const size = row.strong ? 12 : 10;
+    const font = row.strong || row.save ? bold : latin;
+    const color = row.strong || row.save ? brand : ink;
+    drawAt(pen.page, row.label, right - boxWidth + 10, rowY, size, font, cjk, row.strong ? ink : muted);
+    drawAt(pen.page, row.value, right - 10 - widthOf(row.value, size, font, cjk), rowY, size, font, cjk, color);
+    rowY -= 18;
+  }
+  pen.y -= boxHeight + 18;
+
+  const payWidth = pageWidth - margin * 2;
+  const valueWidth = payWidth - (input.image ? 150 : 20) - 100;
+  const payLines = input.seller.flatMap((item) => wrapParagraph(item.value, 9, Math.max(160, valueWidth), latin, cjk).map((text, index) => ({ ...item, text, first: index === 0 })));
+  const payHeight = 28 + payLines.length * 14 + 12;
+  room(payHeight + 8);
+  pen.page.drawRectangle({ x: margin, y: pen.y - payHeight, width: payWidth, height: payHeight, color: cream });
+  drawAt(pen.page, "PAY TO", margin + 12, pen.y - 16, 8, bold, cjk, brand);
+  let payY = pen.y - 34;
+  for (const item of payLines) {
+    if (item.first) drawAt(pen.page, item.label, margin + 12, payY, 9, latin, cjk, muted);
+    drawAt(pen.page, item.text, margin + 112, payY, 9, latin, cjk, ink);
+    payY -= 14;
+  }
+  const image = input.image;
+  if (image && (image.mime === "image/png" || image.mime === "image/jpeg")) {
+    try {
+      const embedded = image.mime === "image/png" ? await pen.doc.embedPng(image.bytes) : await pen.doc.embedJpg(image.bytes);
+      const height = Math.min(108, embedded.height, payHeight - 16);
+      const width = Math.min(108, (embedded.width / embedded.height) * height);
+      pen.page.drawImage(embedded, { x: right - width - 10, y: pen.y - payHeight + 10, width, height });
+    } catch {
+      drawAt(pen.page, "Company QR is stored in Magpie Desk.", right - 180, pen.y - 16, 8, latin, cjk, muted);
+    }
+  }
+  pen.y -= payHeight + 14;
+  if (input.note) drawWrapped(pen, input.note, 9, muted, false, 4);
   return finish(pen);
 }
 

@@ -236,10 +236,11 @@ model InvoiceLine {
   id          String  @id @default(cuid())
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  description String
-  quantity    Decimal @db.Decimal(12, 2)
-  unitAmount  Decimal @db.Decimal(12, 2)
-  sort        Int
+  description  String
+  quantity     Decimal @db.Decimal(12, 2)
+  unitAmount   Decimal @db.Decimal(12, 2)
+  discountRate Decimal @default(0) @db.Decimal(5, 2)
+  sort         Int
 }
 
 model Nda {
