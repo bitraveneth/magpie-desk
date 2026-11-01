@@ -3,7 +3,9 @@ import { PrismaClient } from "@prisma/client";
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient; deskPulse?: boolean };
 
 function databaseUrl() {
-  const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  const pooled = process.env.DATABASE_URL;
+  const direct = process.env.DIRECT_URL;
+  const url = process.env.VERCEL ? pooled || direct : direct || pooled;
   if (!url) throw new Error("Set DATABASE_URL for the desk database.");
   return url;
 }
