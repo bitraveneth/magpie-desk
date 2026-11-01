@@ -1,16 +1,15 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Banner, PageTitle } from "@/components/desk/DeskShell";
+import { Banner, StatusBadge } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
-import { Letterhead } from "@/components/desk/Letterhead";
 import { LineEditor } from "@/components/desk/LineEditor";
-import { quoteTemplates } from "@/content/company";
+import { PaperSheet } from "@/components/desk/PaperSheet";
+import { company, quoteTemplates } from "@/content/company";
 import { companyPrefix, shanghaiStamp } from "@/lib/contract-number";
 import { applyQuoteTemplate, createContract, setQuotationStatus, saveQuotation } from "@/lib/mutations";
-import { money, shanghaiDay, sumLines } from "@/lib/money";
-import { contractCompanyName, getCompany, getJobByQuotation } from "@/lib/queries";
+import { money, shanghaiDay } from "@/lib/money";
+import { contractCompanyName, getPayments, getQuotationPage } from "@/lib/queries";
 
 export default async function QuotationPage({
   params,
@@ -21,18 +20,27 @@ export default async function QuotationPage({
 }) {
   const { id } = await params;
   const messages = await searchParams;
-  const job = await getJobByQuotation(id);
-  const quotation = job?.quotation;
-  if (!job || !quotation || quotation.id !== id) notFound();
-  const profile = await getCompany();
+  const quotation = await getQuotationPage(id);
+  const job = quotation?.requirement;
+  if (!quotation || !job || quotation.id !== id) notFound();
+  const payments = await getPayments();
   const stamp = shanghaiStamp(new Date());
-  const preview = `${companyPrefix(contractCompanyName(job.clientCompany, profile.publicName))}-${stamp.year}-${stamp.date}-XXXX`;
-  const total = sumLines(quotation.lines);
+  const preview = `${companyPrefix(contractCompanyName(job.clientCompany, company.publicName))}-${stamp.year}-${stamp.date}-XXXX`;
   const locked = quotation.status !== "DRAFT";
 
   return (
     <>
-      <PageTitle kicker={quotation.number} title="Quotation" text={`${job.clientName} · ${job.title}`} />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge label={quotation.status === "ACCEPTED" ? "Accepted" : quotation.status === "DECLINED" ? "Declined" : "Draft"} />
+          <Button href={`/quotations/${quotation.id}/pdf`} variant="outline" className="px-4 py-2">
+            Download PDF
+          </Button>
+        </div>
+        <Link href="/quotations/new" className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">
+          New quotation
+        </Link>
+      </div>
       <Banner error={messages.error} notice={messages.notice} />
       <Chain
         current="quotation"
@@ -41,36 +49,32 @@ export default async function QuotationPage({
         contractId={quotation.contract?.id}
         invoiceId={quotation.contract?.invoice?.id}
       />
-      <div className="mb-4">
-        <Badge>
-          {quotation.status === "ACCEPTED" ? "Accepted" : quotation.status === "DECLINED" ? "Declined" : "Draft"}
-        </Badge>
-      </div>
-      <Card>
-        <Letterhead
-          documentName="Quotation"
-          number={quotation.number}
-          date={shanghaiDay(quotation.createdAt)}
-          client={job.clientCompany || job.clientName}
-          project={job.title}
-        />
-        {locked ? null : (
-          <div className="mt-6">
-            <p className="text-sm font-semibold">Start from a price card</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {quoteTemplates.map((template) => (
-                <form key={template.id} action={applyQuoteTemplate}>
-                  <input type="hidden" name="id" value={quotation.id} />
-                  <input type="hidden" name="templateId" value={template.id} />
-                  <Button type="submit" variant="ghost">
-                    {template.name} · USD {template.amount.toLocaleString("en-US")} / {template.cadence}
-                  </Button>
-                </form>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="mt-6">
+      {locked ? null : (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {quoteTemplates.map((template) => (
+            <form key={template.id} action={applyQuoteTemplate}>
+              <input type="hidden" name="id" value={quotation.id} />
+              <input type="hidden" name="templateId" value={template.id} />
+              <Button type="submit" variant="outline" className="px-3 py-2">
+                {template.name} · {money(template.amount, "USD")}
+              </Button>
+            </form>
+          ))}
+        </div>
+      )}
+      <PaperSheet
+        title="QUOTATION"
+        number={quotation.number}
+        date={shanghaiDay(quotation.createdAt)}
+        companyName={payments.companyName}
+        nameEn={company.nameEn}
+        address={payments.address}
+        phone={payments.phone}
+        email={company.email}
+        clientCompany={job.clientCompany}
+        clientName={job.clientName}
+        project={job.title}
+      >
         <LineEditor
           action={saveQuotation}
           quotationId={quotation.id}
@@ -83,17 +87,10 @@ export default async function QuotationPage({
             unitAmount: Number(line.unitAmount).toString(),
           }))}
         />
-        <p className="mt-6 text-lg font-semibold">Total {money(total, quotation.currency)}</p>
-        <div className="mt-4">
-          <Button href={`/quotations/${quotation.id}/pdf`} variant="outline">
-            Download PDF
-          </Button>
-        </div>
-        </div>
-      </Card>
-      <Card className="mt-6">
+      </PaperSheet>
+      <div className="mt-4 flex flex-wrap gap-3">
         {quotation.status === "DRAFT" ? (
-          <div className="flex flex-wrap gap-3">
+          <>
             <form action={setQuotationStatus}>
               <input type="hidden" name="id" value={quotation.id} />
               <input type="hidden" name="status" value="ACCEPTED" />
@@ -102,11 +99,11 @@ export default async function QuotationPage({
             <form action={setQuotationStatus}>
               <input type="hidden" name="id" value={quotation.id} />
               <input type="hidden" name="status" value="DECLINED" />
-              <Button type="submit" variant="ghost">
+              <Button type="submit" variant="outline">
                 Decline
               </Button>
             </form>
-          </div>
+          </>
         ) : null}
         {quotation.status === "DECLINED" ? (
           <form action={setQuotationStatus}>
@@ -119,17 +116,12 @@ export default async function QuotationPage({
         ) : null}
         {quotation.status === "ACCEPTED" && !quotation.contract ? (
           <form action={createContract}>
-            <p className="mb-4 text-sm text-muted">
-              The contract number uses the first two words of the client company, then the year, the date, and a unique code. It will look like {preview}.
-            </p>
             <input type="hidden" name="quotationId" value={quotation.id} />
-            <Button type="submit">Create contract</Button>
+            <Button type="submit">Create contract · {preview}</Button>
           </form>
         ) : null}
-        {quotation.contract ? (
-          <Button href={`/contracts/${quotation.contract.id}`}>Open {quotation.contract.number}</Button>
-        ) : null}
-      </Card>
+        {quotation.contract ? <Button href={`/contracts/${quotation.contract.id}`}>Open {quotation.contract.number}</Button> : null}
+      </div>
     </>
   );
 }

@@ -1,14 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Textarea } from "@/components/ui/Textarea";
-import { Banner, PageTitle } from "@/components/desk/DeskShell";
+import { Banner, StatusBadge } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
-import { Letterhead } from "@/components/desk/Letterhead";
+import { PaperSheet } from "@/components/desk/PaperSheet";
+import { company } from "@/content/company";
 import { createInvoice, saveContract, signContract } from "@/lib/mutations";
 import { shanghaiDate, shanghaiDay } from "@/lib/money";
-import { getJobByContract } from "@/lib/queries";
+import { getContractPage, getPayments } from "@/lib/queries";
 
 export default async function ContractPage({
   params,
@@ -19,56 +18,22 @@ export default async function ContractPage({
 }) {
   const { id } = await params;
   const messages = await searchParams;
-  const job = await getJobByContract(id);
-  const contract = job?.quotation?.contract;
-  if (!job || !job.quotation || !contract || contract.id !== id) notFound();
+  const contract = await getContractPage(id);
+  const job = contract?.quotation.requirement;
+  if (!contract || !job || contract.id !== id) notFound();
+  const payments = await getPayments();
   const signed = contract.status === "SIGNED";
 
   return (
     <>
-      <PageTitle
-        kicker="Contract"
-        title={contract.number}
-        text="The number is the client company's first two words, the year, the date in Shanghai, and a unique code."
-      />
-      <Banner error={messages.error} notice={messages.notice} />
-      <Chain
-        current="contract"
-        requirementId={job.id}
-        quotationId={job.quotation.id}
-        contractId={contract.id}
-        invoiceId={contract.invoice?.id}
-      />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Badge>{signed ? "Signed" : "Draft"}</Badge>
-        {signed && contract.signedAt ? <Badge>Signed {shanghaiDate(contract.signedAt)}</Badge> : null}
-        <Button href={`/contracts/${contract.id}/pdf`} variant="outline">
-          Download PDF
-        </Button>
-      </div>
-      <Card>
-        <Letterhead
-          documentName="Contract"
-          number={contract.number}
-          date={shanghaiDay(contract.signedAt ?? contract.createdAt)}
-          client={job.clientCompany || job.clientName}
-          project={job.title}
-        />
-        {signed ? (
-          <pre className="mt-6 whitespace-pre-wrap text-sm leading-7">{contract.body}</pre>
-        ) : (
-          <form action={saveContract} className="mt-6 grid gap-4">
-            <input type="hidden" name="id" value={contract.id} />
-            <Textarea name="body" rows={16} defaultValue={contract.body} />
-            <div className="flex flex-wrap gap-3">
-              <Button type="submit" variant="outline">
-                Save contract
-              </Button>
-            </div>
-          </form>
-        )}
-      </Card>
-      <Card className="mt-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge label={signed ? "Signed" : "Draft"} />
+          {signed && contract.signedAt ? <StatusBadge label={shanghaiDate(contract.signedAt)} /> : null}
+          <Button href={`/contracts/${contract.id}/pdf`} variant="outline" className="px-4 py-2">
+            Download PDF
+          </Button>
+        </div>
         {signed ? (
           contract.invoice ? (
             <Button href={`/invoices/${contract.invoice.id}`}>Open {contract.invoice.number}</Button>
@@ -84,7 +49,53 @@ export default async function ContractPage({
             <Button type="submit">Mark signed</Button>
           </form>
         )}
-      </Card>
+      </div>
+      <Banner error={messages.error} notice={messages.notice} />
+      <Chain
+        current="contract"
+        requirementId={job.id}
+        quotationId={contract.quotation.id}
+        contractId={contract.id}
+        invoiceId={contract.invoice?.id}
+      />
+      <PaperSheet
+        title="CONTRACT"
+        number={contract.number}
+        date={shanghaiDay(contract.signedAt ?? contract.createdAt)}
+        companyName={payments.companyName}
+        nameEn={company.nameEn}
+        address={payments.address}
+        phone={payments.phone}
+        email={company.email}
+        clientCompany={job.clientCompany}
+        clientName={job.clientName}
+        project={job.title}
+      >
+        <p className="text-[11px] font-semibold tracking-[0.2em] text-[#6b6560]">AGREEMENT</p>
+        {signed ? (
+          <div className="legal-zh mt-4 whitespace-pre-wrap text-sm leading-7 text-[#0f0f0f]">{contract.body}</div>
+        ) : (
+          <form action={saveContract} className="mt-4 grid gap-4">
+            <input type="hidden" name="id" value={contract.id} />
+            <textarea
+              name="body"
+              rows={16}
+              defaultValue={contract.body}
+              className="legal-zh w-full rounded-xl border border-[#e5dfd4] px-4 py-3 text-sm leading-7 text-[#0f0f0f] outline-none focus:border-[#5c2d91]"
+            />
+            <div className="flex justify-end">
+              <Button type="submit">Save contract</Button>
+            </div>
+          </form>
+        )}
+      </PaperSheet>
+      <p className="mt-4 text-sm text-gray-500">
+        The requirement for this contract is{" "}
+        <Link href={`/requirements/${job.id}`} className="font-medium text-brand-500">
+          {job.number}
+        </Link>
+        .
+      </p>
     </>
   );
 }

@@ -10,7 +10,12 @@ export default async function QuotationsPage() {
 
   return (
     <>
-      <PageTitle kicker="Quotations" title="Quotations" text="A quotation is the price offer. The PDF uses the same Magpie header and company footer as the other papers." />
+      <PageTitle kicker="Quotations" title="Quotations" text="A quotation is the price offer. Open one any time, then send the PDF." />
+      <div className="mb-4 flex justify-end">
+        <Link href="/quotations/new" className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">
+          New quotation
+        </Link>
+      </div>
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pt-4 pb-3 sm:px-6">
         <h2 className="mb-4 text-lg font-semibold text-gray-800">All quotations</h2>
         <div className="max-w-full overflow-x-auto">

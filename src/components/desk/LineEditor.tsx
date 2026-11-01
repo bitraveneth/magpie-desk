@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { lineAmount, money } from "@/lib/money";
 
 type Row = { key: string; description: string; quantity: string; unitAmount: string };
 
@@ -13,7 +13,7 @@ export function LineEditor({
   lines,
   locked,
   extra,
-  submitLabel = "Save lines",
+  submitLabel = "Save quotation",
 }: {
   action: (formData: FormData) => void;
   quotationId: string;
@@ -26,80 +26,137 @@ export function LineEditor({
   const [rows, setRows] = useState<Row[]>(
     lines.length > 0 ? lines : [{ key: "new-0", description: "", quantity: "1", unitAmount: "0" }],
   );
+  const [moneyCode, setMoneyCode] = useState(currency);
+  const shown = locked ? lines : rows;
+  const total = shown.reduce((sum, row) => sum + lineAmount(Number(row.quantity) || 0, Number(row.unitAmount) || 0), 0);
 
-  if (locked) {
-    return (
+  const table = (
+    <div>
+      {extra}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[36rem] text-left text-sm">
-          <thead className="text-muted">
-            <tr>
-              <th className="py-2 pr-3 font-medium">Description</th>
-              <th className="py-2 pr-3 font-medium">Qty</th>
-              <th className="py-2 font-medium">Unit</th>
+        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+          <thead>
+            <tr className="bg-[#5c2d91] text-[11px] tracking-[0.14em] text-white uppercase">
+              <th className="rounded-l-lg px-3 py-3 font-medium">Description</th>
+              <th className="px-3 py-3 font-medium">Qty</th>
+              <th className="px-3 py-3 font-medium">Unit price</th>
+              <th className={`px-3 py-3 text-right font-medium ${locked ? "rounded-r-lg" : ""}`}>Amount</th>
+              {locked ? null : <th className="w-16 rounded-r-lg" />}
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => (
-              <tr key={line.key} className="border-t border-border">
-                <td className="py-3 pr-3">{line.description}</td>
-                <td className="py-3 pr-3">{line.quantity}</td>
-                <td className="py-3">
-                  {currency} {line.unitAmount}
-                </td>
-              </tr>
-            ))}
+            {shown.map((row, index) => {
+              const amount = lineAmount(Number(row.quantity) || 0, Number(row.unitAmount) || 0);
+              return (
+                <tr key={row.key} className={index % 2 === 1 ? "bg-[#fbf9f6]" : "bg-white"}>
+                  <td className="border-b border-[#f0ebe3] px-3 py-3">
+                    {locked ? (
+                      <span className="font-medium text-[#0f0f0f]">{row.description}</span>
+                    ) : (
+                      <input
+                        name="description"
+                        defaultValue={row.description}
+                        placeholder="What this price covers"
+                        className="w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-[#0f0f0f] outline-none focus:border-[#e5dfd4]"
+                        onChange={(event) => update(index, { description: event.target.value })}
+                      />
+                    )}
+                  </td>
+                  <td className="border-b border-[#f0ebe3] px-3 py-3 text-[#3d3935]">
+                    {locked ? (
+                      Number(row.quantity)
+                    ) : (
+                      <input
+                        name="quantity"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        defaultValue={row.quantity}
+                        className="w-20 rounded-md border border-[#e5dfd4] bg-white px-2 py-1.5"
+                        onChange={(event) => update(index, { quantity: event.target.value })}
+                      />
+                    )}
+                  </td>
+                  <td className="border-b border-[#f0ebe3] px-3 py-3 text-[#3d3935]">
+                    {locked ? (
+                      money(Number(row.unitAmount), moneyCode)
+                    ) : (
+                      <input
+                        name="unitAmount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        defaultValue={row.unitAmount}
+                        className="w-28 rounded-md border border-[#e5dfd4] bg-white px-2 py-1.5"
+                        onChange={(event) => update(index, { unitAmount: event.target.value })}
+                      />
+                    )}
+                  </td>
+                  <td className="border-b border-[#f0ebe3] px-3 py-3 text-right font-semibold text-[#0f0f0f]">
+                    {money(amount, moneyCode)}
+                  </td>
+                  {locked ? null : (
+                    <td className="border-b border-[#f0ebe3] py-3 text-right">
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-[#6b6560] hover:text-red-600"
+                        onClick={() => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-    );
-  }
-
-  return (
-    <form action={action} className="grid gap-4">
-      <input type="hidden" name="id" value={quotationId} />
-      {extra}
-      <label className="block max-w-40">
-        <span className="mb-2 block text-sm font-semibold">Currency</span>
-        <Input name="currency" defaultValue={currency} maxLength={3} />
-      </label>
-      {rows.map((row, index) => (
-        <div key={row.key} className="grid gap-3 sm:grid-cols-[1fr_6rem_8rem_auto] sm:items-end">
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold">Description</span>
-            <Input name="description" defaultValue={row.description} />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold">Qty</span>
-            <Input name="quantity" type="number" min="0.01" step="0.01" defaultValue={row.quantity} />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold">Unit amount</span>
-            <Input name="unitAmount" type="number" min="0" step="0.01" defaultValue={row.unitAmount} />
-          </label>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-          >
-            Remove
-          </Button>
-        </div>
-      ))}
-      <div className="flex flex-wrap gap-3">
-        <Button
+      {locked ? null : (
+        <button
           type="button"
-          variant="outline"
+          className="mt-3 text-sm font-medium text-[#5c2d91]"
           onClick={() =>
-            setRows((current) => [
-              ...current,
-              { key: `new-${current.length}-${Date.now()}`, description: "", quantity: "1", unitAmount: "0" },
-            ])
+            setRows((current) => [...current, { key: `new-${current.length}-${Date.now()}`, description: "", quantity: "1", unitAmount: "0" }])
           }
         >
           Add line
-        </Button>
-        <Button type="submit">{submitLabel}</Button>
+        </button>
+      )}
+      <div className="mt-6 flex justify-end">
+        <div className="flex w-full max-w-sm items-center justify-between rounded-xl bg-[#5c2d91] px-4 py-3 text-white">
+          <span className="text-base font-semibold">Total</span>
+          <span className="text-base font-semibold">{money(Math.round(total * 100) / 100, moneyCode)}</span>
+        </div>
       </div>
+      {locked ? null : (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#f0ebe3] pt-4">
+          <label className="text-sm text-[#6b6560]">
+            Currency
+            <input
+              name="currency"
+              defaultValue={currency}
+              maxLength={3}
+              className="ml-2 h-10 w-20 rounded-lg border border-[#e5dfd4] px-2 uppercase"
+              onChange={(event) => setMoneyCode(event.target.value.toUpperCase() || currency)}
+            />
+          </label>
+          <Button type="submit">{submitLabel}</Button>
+        </div>
+      )}
+    </div>
+  );
+
+  function update(index: number, patch: Partial<Row>) {
+    setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  }
+
+  if (locked) return table;
+
+  return (
+    <form action={action}>
+      <input type="hidden" name="id" value={quotationId} />
+      {table}
     </form>
   );
 }

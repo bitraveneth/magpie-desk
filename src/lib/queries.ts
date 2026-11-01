@@ -3,6 +3,7 @@ import { company, paymentDefaults } from "@/content/company";
 import { questionBank } from "@/content/questions";
 import { ensurePipelineSamples } from "@/lib/sample-pipeline";
 import { prisma } from "@/lib/db";
+import { remember } from "@/lib/read-cache";
 import { formatDocumentNumber, invoiceNumberBase, shortNumber, uniqueCode } from "@/lib/contract-number";
 import { ndaBody } from "@/lib/nda-text";
 
@@ -231,7 +232,7 @@ export async function ensurePaymentDefaults() {
 
 export async function getPayments() {
   await ensureDesk();
-  return ensurePaymentDefaults();
+  return remember("payments", () => ensurePaymentDefaults());
 }
 
 export function paymentDetailLines(payments: {
@@ -256,7 +257,7 @@ export function paymentDetailLines(payments: {
 
 export async function getJob(id: string) {
   await ensureDesk();
-  return prisma.requirement.findUnique({ where: { id }, include: jobInclude });
+  return remember(`job:${id}`, () => prisma.requirement.findUnique({ where: { id }, include: jobInclude }));
 }
 
 export async function getJobByToken(shareToken: string) {
@@ -301,15 +302,17 @@ const invoiceInclude = {
 
 export async function getInvoiceRecord(id: string) {
   await ensureDesk();
-  return prisma.invoice.findUnique({ where: { id }, include: invoiceInclude });
+  return remember(`invoice:${id}`, () => prisma.invoice.findUnique({ where: { id }, include: invoiceInclude }));
 }
 
 export async function listInvoices() {
   await ensureDesk();
-  return prisma.invoice.findMany({
-    orderBy: { updatedAt: "desc" },
-    include: invoiceInclude,
-  });
+  return remember("invoices", () =>
+    prisma.invoice.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: invoiceInclude,
+    }),
+  );
 }
 
 export async function takeInvoiceNumber(otherCompany: string) {
@@ -339,28 +342,32 @@ export function invoiceParties(invoice: {
 
 export async function listRequirements() {
   await ensureDesk();
-  return prisma.requirement.findMany({
-    orderBy: { updatedAt: "desc" },
-    include: {
-      partner: true,
-      nda: true,
-      quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
-    },
-  });
+  return remember("requirements", () =>
+    prisma.requirement.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: {
+        partner: true,
+        nda: true,
+        quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+      },
+    }),
+  );
 }
 
 export async function listPartners() {
   await ensureDesk();
-  return prisma.partner.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      requirements: {
-        include: {
-          quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+  return remember("partners", () =>
+    prisma.partner.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        requirements: {
+          include: {
+            quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+          },
         },
       },
-    },
-  });
+    }),
+  );
 }
 
 export async function getPartner(id: string) {
@@ -400,13 +407,42 @@ export async function takeDocumentNumber(companyName: string, kind?: "NDA") {
 
 export async function listQuotations() {
   await ensureDesk();
-  return prisma.quotation.findMany({
-    orderBy: { updatedAt: "desc" },
-    include: {
-      lines: { orderBy: { sort: "asc" } },
-      requirement: { select: { id: true, title: true, clientName: true, clientCompany: true, sample: true } },
-    },
-  });
+  return remember("quotations", () =>
+    prisma.quotation.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: {
+        lines: { orderBy: { sort: "asc" } },
+        requirement: { select: { id: true, title: true, clientName: true, clientCompany: true, sample: true } },
+      },
+    }),
+  );
+}
+
+export async function getQuotationPage(id: string) {
+  await ensureDesk();
+  return remember(`quotation:${id}`, () =>
+    prisma.quotation.findUnique({
+      where: { id },
+      include: {
+        lines: { orderBy: { sort: "asc" } },
+        requirement: true,
+        contract: { include: { invoice: { select: { id: true, number: true } } } },
+      },
+    }),
+  );
+}
+
+export async function getContractPage(id: string) {
+  await ensureDesk();
+  return remember(`contract:${id}`, () =>
+    prisma.contract.findUnique({
+      where: { id },
+      include: {
+        invoice: { select: { id: true, number: true } },
+        quotation: { include: { requirement: true } },
+      },
+    }),
+  );
 }
 
 export async function takeShortNumber(prefix: "REQ" | "QUO" | "INV") {

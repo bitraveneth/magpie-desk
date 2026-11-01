@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { quoteTemplates } from "@/content/company";
 import { prisma } from "@/lib/db";
+import { forgetReads } from "@/lib/read-cache";
 import { currencyCode } from "@/lib/money";
 import { ndaBody } from "@/lib/nda-text";
 import {
@@ -21,6 +22,7 @@ function fail(path: string, message: string): never {
 }
 
 function done(path: string, notice: string): never {
+  forgetReads();
   revalidatePath("/", "layout");
   redirect(`${path}?notice=${encodeURIComponent(notice)}`);
 }
@@ -168,6 +170,38 @@ export async function createQuotation(formData: FormData) {
     },
   });
   done(`/quotations/${quotation.id}`, template ? `${template.name} template added.` : "Quotation started.");
+}
+
+export async function createDeskQuotation(formData: FormData) {
+  const clientName = text(formData, "clientName");
+  const clientCompany = text(formData, "clientCompany");
+  const title = text(formData, "title");
+  if (!clientName && !clientCompany) fail("/quotations/new", "Add the other company or a client name.");
+  if (!title) fail("/quotations/new", "Add what this quotation is for.");
+
+  const requirement = await prisma.requirement.create({
+    data: {
+      number: await takeShortNumber("REQ"),
+      shareToken: await takeShareToken(),
+      clientName,
+      clientEmail: "",
+      clientCompany,
+      title,
+      summary: "Opened from the quotations desk.",
+      status: "READY",
+      briefStatus: "FILLED",
+      confirmedAt: new Date(),
+    },
+  });
+  const quotation = await prisma.quotation.create({
+    data: {
+      number: await takeShortNumber("QUO"),
+      requirementId: requirement.id,
+      currency: currencyCode(text(formData, "currency") || "CNY"),
+      lines: { create: [{ description: title, quantity: 1, unitAmount: 0, sort: 0 }] },
+    },
+  });
+  done(`/quotations/${quotation.id}`, "Quotation created. Add the line items you need.");
 }
 
 export async function returnForCorrection(formData: FormData) {
