@@ -7,9 +7,8 @@ import { company, paymentDefaults } from "@/content/company";
 const pageWidth = 595.28;
 const pageHeight = 841.89;
 const margin = 48;
-const footerBand = 96;
-const contentFloor = 112;
-const accentStrong = rgb(0.29, 0.141, 0.463);
+const footerBand = 72;
+const contentFloor = 86;
 const ink = rgb(0.059, 0.059, 0.059);
 const muted = rgb(0.42, 0.396, 0.376);
 const accent = rgb(0.361, 0.176, 0.569);
@@ -294,62 +293,24 @@ function drawMasthead(pen: Pen, first: boolean) {
   pen.y = pageHeight - 60;
 }
 
-function ribbonIcon(page: PDFPage, kind: "company" | "pin" | "phone", x: number, top: number) {
-  const paths = {
-    company: "M 1.5 11 V 4.5 H 4 V 1.5 H 8 V 4.5 H 10.5 V 11 Z M 4.6 11 V 7.6 H 7.4 V 11",
-    pin: "M 6 11.2 C 6 11.2 1.2 7 1.2 4.4 A 4.8 4.8 0 1 1 10.8 4.4 C 10.8 7 6 11.2 6 11.2 Z",
-    phone: "M 3.2 1.4 H 8.8 A 1 1 0 0 1 9.8 2.4 V 9.8 A 1 1 0 0 1 8.8 10.8 H 3.2 A 1 1 0 0 1 2.2 9.8 V 2.4 A 1 1 0 0 1 3.2 1.4 Z M 5 8.8 H 7",
-  };
-  page.drawSvgPath(paths[kind], {
-    x,
-    y: top,
-    borderColor: white,
-    borderWidth: 0.9,
-  });
-  if (kind === "pin") {
-    page.drawCircle({ x: x + 6, y: top - 4.6, size: 1.15, borderColor: white, borderWidth: 0.8 });
-  }
+function drawCentered(pen: Pen, page: PDFPage, text: string, y: number, size: number, font: PDFFont, color: RGB) {
+  drawAt(page, text, (pageWidth - widthOf(text, size, font, pen.cjk)) / 2, y, size, font, pen.cjk, color);
 }
 
-function drawFooter(pen: Pen, page: PDFPage, index: number, total: number) {
-  const left = 32;
-  const width = pageWidth - 64;
-  const top = 90;
-  page.drawSvgPath("M 14 62 L 26 52 L 26 74 L 14 66 Z", { x: left, y: top, color: accentStrong });
-  page.drawSvgPath(`M 16 0 L ${width - 16} 0 L ${width + 6} 32 L ${width - 16} 64 L 16 64 L -6 32 Z`, {
-    x: left,
-    y: top,
+function drawFooter(pen: Pen, page: PDFPage) {
+  page.drawLine({
+    start: { x: margin, y: 58 },
+    end: { x: pageWidth - margin, y: 58 },
+    thickness: 1,
     color: accent,
   });
-
-  const phone = displayPhone(pen.footer.phone);
-  const textLeft = left + 40;
-  const textRight = left + width - 28;
-  const splitAt = pen.footer.address.indexOf(" ");
-  const addressLines =
-    splitAt > 8
-      ? [pen.footer.address.slice(0, splitAt), pen.footer.address.slice(splitAt + 1)]
-      : wrapParagraph(pen.footer.address, 8, textRight - textLeft, pen.latin, pen.cjk).slice(0, 2);
-
-  ribbonIcon(page, "company", left + 18, top - 12);
-  drawAt(page, pen.footer.companyName, textLeft, top - 22, 9, pen.bold, pen.cjk, white);
-  const phoneWidth = widthOf(phone, 9, pen.bold, pen.cjk);
-  ribbonIcon(page, "phone", textRight - phoneWidth - 20, top - 12);
-  drawAt(page, phone, textRight - phoneWidth, top - 22, 9, pen.bold, pen.cjk, white);
-
-  ribbonIcon(page, "pin", left + 18, top - 36);
-  addressLines.forEach((line, lineIndex) => {
-    drawAt(page, line, textLeft, top - 46 - lineIndex * 12, 8, pen.latin, pen.cjk, white);
+  drawCentered(pen, page, pen.footer.companyName, 40, 9, pen.bold, ink);
+  const addressLines = wrapParagraph(pen.footer.address, 8, pageWidth - margin * 2, pen.latin, pen.cjk).slice(0, 2);
+  addressLines.forEach((line, index) => {
+    drawCentered(pen, page, line, 26 - index * 12, 8, pen.latin, muted);
   });
-
-  const label = `${index + 1} / ${total}`;
-  page.drawText(label, {
-    x: textRight - pen.latin.widthOfTextAtSize(label, 8),
-    y: top - 56,
-    size: 8,
-    font: pen.latin,
-    color: white,
-  });
+  const phoneY = 26 - addressLines.length * 12;
+  drawCentered(pen, page, displayPhone(pen.footer.phone), phoneY, 8, pen.latin, ink);
 }
 
 async function openPen(input: { party: PdfParty; title: string; number: string; date: string; footer?: PdfFooter }): Promise<Pen> {
@@ -398,7 +359,7 @@ async function startPdf(party: PdfParty, documentName: string, number: string, c
 
 function finish(pen: Pen): Promise<Uint8Array> {
   const pages = pen.doc.getPages();
-  pages.forEach((page, index) => drawFooter(pen, page, index, pages.length));
+  pages.forEach((page) => drawFooter(pen, page));
   return pen.doc.save();
 }
 
