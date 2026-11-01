@@ -39,7 +39,7 @@ export default async function QuestionEditorPage({
       <PageTitle
         kicker="Questions"
         title="Question bank"
-        text="Edit the brief the client fills. Hidden questions leave the form. Answers already saved stay on the requirement."
+        text="The client first chooses Website, Ecommerce website, App, or ERP. Only that part is asked, plus who they are and a short description. Hidden questions stay off the form."
       />
       <Banner error={messages.error} notice={messages.notice} />
       <form action={saveQuestions}>

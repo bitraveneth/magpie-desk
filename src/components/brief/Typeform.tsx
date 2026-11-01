@@ -283,7 +283,7 @@ export function Typeform({
                 <p className="mx-auto mt-4 max-w-sm rounded-2xl bg-accent/10 px-4 py-3 text-sm leading-6 text-accent-strong">{correctionNote}</p>
               ) : null}
               <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-muted">
-                Anyone with this link can answer. A phone shows one question at a time. A larger screen shows the whole section.
+                Anyone with this link can answer. First say if this is a website, an online shop, an app, or an ERP. Only those questions come next.
               </p>
               <button type="button" className={`${primaryBtn} mt-8 w-full`} onClick={begin}>
                 {started ? "Continue" : "Start"}

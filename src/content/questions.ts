@@ -19,12 +19,15 @@ export type QuestionSeed = {
 
 const company = ["company", "Company", 1] as const;
 const project = ["project", "Project", 2] as const;
-const website = ["website", "Website content", 3] as const;
-const app = ["app", "App", 4] as const;
-const erp = ["erp", "ERP", 5] as const;
-const brand = ["brand", "References and brand", 6] as const;
-const technical = ["technical", "Technical", 7] as const;
-const budget = ["budget", "Budget, time, and documents", 8] as const;
+const website = ["website", "Website", 3] as const;
+const shop = ["shop", "Online shop", 4] as const;
+const app = ["app", "App", 5] as const;
+const erp = ["erp", "ERP", 6] as const;
+const brand = ["brand", "References and brand", 7] as const;
+const technical = ["technical", "Technical", 8] as const;
+const budget = ["budget", "Budget and launch", 9] as const;
+
+const buildTypes = ["WEBSITE", "SHOP", "APP", "ERP"];
 
 const fileHelp = "PDF, Word, PNG, JPEG, or WebP. Up to 8 MB each. You can add more than one file.";
 
@@ -64,11 +67,11 @@ export const questionBank: QuestionSeed[] = [
   }),
   q(company, 6, "city-country", "City and country", "SHORT"),
 
-  q(project, 1, "project-type", "What do you need?", "DROPDOWN", {
+  q(project, 1, "project-type", "What do you need to build?", "DROPDOWN", {
     required: true,
     locked: true,
-    help: "This chooses the website, app, or ERP questions that follow.",
-    options: ["Website", "Mobile app", "ERP"],
+    help: "Choose one. Only the questions for that work come next.",
+    options: ["Website", "Ecommerce website", "Mobile app", "ERP"],
   }),
   q(project, 2, "project-kind", "Is this a new build, a redesign, or a fix?", "DROPDOWN", {
     options: ["New build", "Redesign", "A fix"],
@@ -98,7 +101,34 @@ export const questionBank: QuestionSeed[] = [
     types: ["WEBSITE"],
     options: ["Rarely by us", "Often by us", "Magpie will update it", "Not sure"],
   }),
+  q(shop, 1, "shop-sell", "What are you selling?", "LONG", {
+    types: ["SHOP"],
+    required: true,
+    help: "Products, tickets, bookings, or something else.",
+  }),
+  q(shop, 2, "shop-payments", "How should people pay?", "MULTI", {
+    types: ["SHOP"],
+    options: ["Card", "WeChat", "Alipay", "Bank transfer", "Cash on delivery"],
+  }),
+  q(shop, 3, "shop-delivery", "How do orders reach the customer?", "DROPDOWN", {
+    types: ["SHOP"],
+    options: ["Shipping", "Pickup", "Both", "Digital only"],
+  }),
+  q(shop, 4, "shop-catalog", "About how many products at launch?", "DROPDOWN", {
+    types: ["SHOP"],
+    options: ["Under 20", "20–200", "200–2,000", "More than 2,000"],
+  }),
+  q(shop, 5, "shop-copy", "Who writes the product descriptions?", "DROPDOWN", {
+    types: ["SHOP"],
+    options: ["We have them", "We have some", "Magpie should write them"],
+  }),
+  q(shop, 6, "shop-files", "Upload a product list if you have one", "FILE", {
+    types: ["SHOP"],
+    help: fileHelp,
+  }),
+
   q(technical, 0, "site-languages", "Which languages must it support?", "MULTI", {
+    types: buildTypes,
     help: "Choose every language people will read or use.",
     options: [
       "English",
@@ -172,6 +202,7 @@ export const questionBank: QuestionSeed[] = [
   q(brand, 5, "style-notes", "Colors or styles to use, and anything to avoid", "LONG"),
 
   q(technical, 1, "dev-language", "Preferred development languages", "MULTI", {
+    types: buildTypes,
     help: "Choose every language or framework you want. Next.js and TypeScript can both be selected.",
     options: [
       "No preference",
@@ -209,16 +240,18 @@ export const questionBank: QuestionSeed[] = [
   q(technical, 6, "approver", "Who gives final approval?", "SHORT"),
 
   q(budget, 1, "has-budget", "Do you already have a budget in mind?", "DROPDOWN", {
+    types: buildTypes,
     options: ["Yes", "No"],
   }),
   q(budget, 2, "budget-range", "Budget range", "DROPDOWN", {
+    types: buildTypes,
     help: "In USD. Shown when you already have a budget in mind.",
     options: ["Under 1,000", "1,000–3,000", "3,000–5,000", "5,000–15,000", "15,000–50,000", "Over 50,000"],
     required: true,
     dependsOn: "has-budget",
     dependsValue: "Yes",
   }),
-  q(budget, 3, "launch-date", "Target launch date", "DATE"),
+  q(budget, 3, "launch-date", "Target launch date", "DATE", { types: buildTypes }),
   q(budget, 4, "date-fixed", "Is that date fixed to an event?", "DROPDOWN", {
     options: ["Yes", "No"],
   }),

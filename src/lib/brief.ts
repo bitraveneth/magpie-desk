@@ -1,8 +1,11 @@
 export const PROJECT_TYPES = {
   Website: "WEBSITE",
+  "Ecommerce website": "SHOP",
   "Mobile app": "APP",
   ERP: "ERP",
 } as const;
+
+const alwaysAsked = new Set(["company-name", "contact-name", "work-email", "project-type", "project-description"]);
 
 export type BriefQuestion = {
   id: string;
@@ -62,10 +65,10 @@ export function answerMap(answers: { questionId: string; value: string }[]): Map
 
 export function questionVisible(question: BriefQuestion, answers: Map<string, string>): boolean {
   if (question.hidden) return false;
-  if (question.types.length > 0) {
+  if (!alwaysAsked.has(question.id)) {
     const selected = answers.get("project-type") ?? "";
     const code = PROJECT_TYPES[selected as keyof typeof PROJECT_TYPES];
-    if (!code || !question.types.includes(code)) return false;
+    if (!code || question.types.length === 0 || !question.types.includes(code)) return false;
   }
   if (question.dependsOn && (answers.get(question.dependsOn) ?? "") !== question.dependsValue) return false;
   return true;

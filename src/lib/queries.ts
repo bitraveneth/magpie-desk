@@ -113,7 +113,65 @@ async function loadDesk() {
 
   await ensureQuestions();
   await refreshUntouchedQuestions();
+  await syncQuestionPath();
   await ensurePipelineSamples();
+}
+
+async function syncQuestionPath() {
+  const gate = await prisma.requirementQuestion.findUnique({ where: { id: "project-type" }, select: { options: true } });
+  const shop = await prisma.requirementQuestion.findUnique({ where: { id: "shop-sell" }, select: { id: true } });
+  const languages = await prisma.requirementQuestion.findUnique({ where: { id: "site-languages" }, select: { types: true } });
+  const ready =
+    gate?.options.includes("Ecommerce website") &&
+    Boolean(shop) &&
+    languages?.types.includes("WEBSITE") &&
+    languages.types.includes("SHOP");
+  if (ready) return;
+
+  for (let index = 0; index < questionBank.length; index += 6) {
+    const chunk = questionBank.slice(index, index + 6);
+    await prisma.$transaction(
+      chunk.map((question) =>
+        prisma.requirementQuestion.upsert({
+          where: { id: question.id },
+          update: {
+            types: question.types,
+            section: question.section,
+            sectionLabel: question.sectionLabel,
+            sectionSort: question.sectionSort,
+            sort: question.sort,
+            ...(question.id === "project-type" || question.section === "shop"
+              ? {
+                  label: question.label,
+                  help: question.help,
+                  kind: question.kind,
+                  options: question.options,
+                  required: question.required,
+                  locked: question.locked,
+                }
+              : {}),
+          },
+          create: {
+            id: question.id,
+            section: question.section,
+            sectionLabel: question.sectionLabel,
+            sort: question.sort,
+            sectionSort: question.sectionSort,
+            label: question.label,
+            help: question.help,
+            kind: question.kind,
+            options: question.options,
+            types: question.types,
+            required: question.required,
+            locked: question.locked,
+            dependsOn: question.dependsOn,
+            dependsValue: question.dependsValue,
+          },
+        }),
+      ),
+    );
+  }
+  invalidateQuestionCache();
 }
 
 const retiredChoices: Record<string, { kind: string; options: string[] }> = {
@@ -156,35 +214,29 @@ async function refreshUntouchedQuestions() {
 }
 
 async function ensureQuestions() {
-  const count = await prisma.requirementQuestion.count();
-  if (count >= questionBank.length) return;
-  await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(8421102)`;
-    const current = await tx.requirementQuestion.count();
-    if (current >= questionBank.length) return;
-    for (const question of questionBank) {
-      await tx.requirementQuestion.upsert({
-        where: { id: question.id },
-        update: {},
-        create: {
-          id: question.id,
-          section: question.section,
-          sectionLabel: question.sectionLabel,
-          sort: question.sort,
-          sectionSort: question.sectionSort,
-          label: question.label,
-          help: question.help,
-          kind: question.kind,
-          options: question.options,
-          types: question.types,
-          required: question.required,
-          locked: question.locked,
-          dependsOn: question.dependsOn,
-          dependsValue: question.dependsValue,
-        },
-      });
-    }
-  });
+  const existing = await prisma.requirementQuestion.findMany({ select: { id: true } });
+  const have = new Set(existing.map((row) => row.id));
+  for (const question of questionBank) {
+    if (have.has(question.id)) continue;
+    await prisma.requirementQuestion.create({
+      data: {
+        id: question.id,
+        section: question.section,
+        sectionLabel: question.sectionLabel,
+        sort: question.sort,
+        sectionSort: question.sectionSort,
+        label: question.label,
+        help: question.help,
+        kind: question.kind,
+        options: question.options,
+        types: question.types,
+        required: question.required,
+        locked: question.locked,
+        dependsOn: question.dependsOn,
+        dependsValue: question.dependsValue,
+      },
+    });
+  }
 }
 
 export async function listQuestions() {
