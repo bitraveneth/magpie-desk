@@ -1,62 +1,49 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
-import { Banner, PageTitle, SampleNote, StatusBadge } from "@/components/desk/DeskShell";
-import { deskStatus } from "@/lib/brief";
+import { Banner, PageTitle } from "@/components/desk/DeskShell";
+import { RequirementsTable } from "@/components/desk/RequirementsTable";
 import { listRequirements } from "@/lib/queries";
-import { shanghaiDate } from "@/lib/money";
 
 export default async function RequirementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; q?: string }>;
 }) {
   const messages = await searchParams;
-  const jobs = await listRequirements();
+  const query = (messages.q ?? "").trim();
+  const needle = query.toLowerCase();
+  const jobs = (await listRequirements()).filter((job) => {
+    if (!needle) return true;
+    return [job.title, job.clientName, job.clientCompany, job.number, job.clientEmail].join(" ").toLowerCase().includes(needle);
+  });
 
   return (
     <>
-      <PageTitle kicker="Requirements" title="Briefs" text="Open a filled brief to review it, download the PDF, send it back, or confirm it." />
+      <PageTitle kicker="Requirements" title="Requirements" text="Open a filled brief to review it, download the PDF, send it back, or confirm it." />
       <Banner error={messages.error} notice={messages.notice} />
-      <div className="mb-4 flex flex-wrap gap-3">
-        <Button href="/requirements/new">New requirement</Button>
-        <Button href="/requirements/questions" variant="outline">Edit questions</Button>
-      </div>
-      <div className="overflow-hidden rounded-2xl border border-[#e6e8ef] bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-[#f8f9fc] text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Project</th>
-                <th className="px-5 py-3 font-semibold">Client</th>
-                <th className="px-5 py-3 font-semibold">Stage</th>
-                <th className="px-5 py-3 font-semibold">Updated</th>
-                <th className="px-5 py-3 font-semibold"> </th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((job) => (
-                <tr key={job.id} className="border-t border-[#e6e8ef]">
-                  <td className="px-5 py-4">
-                    <Link href={`/requirements/${job.id}`} className="font-semibold hover:text-accent">{job.title}</Link>
-                    <p className="mt-1 text-xs text-muted">{job.number}</p>
-                    <div className="mt-2"><SampleNote sample={job.sample} /></div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <p>{job.clientName}</p>
-                    <p className="text-xs text-muted">{job.clientCompany}</p>
-                  </td>
-                  <td className="px-5 py-4"><StatusBadge label={deskStatus(job)} /></td>
-                  <td className="px-5 py-4 text-muted">{shanghaiDate(job.updatedAt)}</td>
-                  <td className="px-5 py-4 text-right">
-                    <Link href={`/requirements/${job.id}`} className="font-semibold text-accent">View</Link>
-                    <Link href={`/requirements/${job.id}/pdf`} className="ml-4 font-semibold text-accent">PDF</Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <form action="/requirements" className="w-full max-w-md">
+          <input
+            name="q"
+            defaultValue={query}
+            placeholder="Search requirements"
+            className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 focus:outline-none"
+          />
+        </form>
+        <div className="flex items-center gap-3">
+          <Link href="/requirements/questions" className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50">
+            Edit questions
+          </Link>
+          <Link href="/requirements/new" className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">
+            New requirement
+          </Link>
         </div>
       </div>
+      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pt-4 pb-3 sm:px-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">{query ? `Results for “${query}”` : "All requirements"}</h2>
+        </div>
+        <RequirementsTable jobs={jobs} empty={query ? "No requirements match that search." : "No requirements yet."} />
+      </section>
     </>
   );
 }

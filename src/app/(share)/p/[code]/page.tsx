@@ -23,12 +23,13 @@ export default async function PartnerLinkPage({
   return (
     <DeskShell publicMode>
       <PageTitle
+        variant="public"
         kicker="Partner link"
         title={`Start a requirement with ${partner.name}`}
         text={`This link belongs to ${partner.name}. Magpie Studio will attribute the requirement to them. You will get a separate requirement link after you submit.`}
       />
-      <Banner error={messages.error} notice={messages.notice} />
-      <SampleNote sample={partner.sample} />
+      <Banner variant="public" error={messages.error} notice={messages.notice} />
+      <SampleNote variant="public" sample={partner.sample} />
       <Card className="mt-4">
         <form action={createRequirement} className="grid gap-4">
           <input type="hidden" name="partnerCode" value={partner.code} />

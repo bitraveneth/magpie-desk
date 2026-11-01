@@ -10,6 +10,13 @@ const urbanist = localFont({
   display: "swap",
 });
 
+const outfit = localFont({
+  src: "../fonts/outfit-latin.woff2",
+  variable: "--font-outfit",
+  weight: "100 900",
+  display: "swap",
+});
+
 const fugazOne = localFont({
   src: "../fonts/fugaz-one.woff2",
   variable: "--font-hero-title",
@@ -40,7 +47,7 @@ export const dynamic = "force-dynamic";
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${urbanist.variable} ${fugazOne.variable} ${notoSansSc.variable}`}>
+    <html lang="en" className={`${urbanist.variable} ${outfit.variable} ${fugazOne.variable} ${notoSansSc.variable}`}>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );
