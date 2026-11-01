@@ -92,3 +92,9 @@ body {
     padding: 2rem;
   }
 }
+
+@media (min-width: 1024px) {
+  .brief-frame:has(.brief-board) {
+    width: min(100% - 3rem, 56rem);
+  }
+}

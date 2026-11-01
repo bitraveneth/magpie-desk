@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import {
   answerBlank,
   answerProblem,
+  groupSections,
   parseMulti,
   parseUrlRows,
   questionVisible,
@@ -67,6 +68,9 @@ export function Typeform({
   const [email, setEmail] = useState(signerEmail);
   const [wantNda, setWantNda] = useState(false);
   const [ndaDone, setNdaDone] = useState(ndaSigned);
+  const [errorId, setErrorId] = useState("");
+  const [wide, setWide] = useState(false);
+  const [sectionIndex, setSectionIndex] = useState(0);
   const dirty = useRef<Record<string, string>>({});
   const timer = useRef<number | null>(null);
 
@@ -79,10 +83,19 @@ export function Typeform({
 
   const step = Math.min(index, Math.max(list.length - 1, 0));
   const question = list[step];
-  const progress = phase === "welcome" ? 0 : phase === "questions" ? ((step + 1) / Math.max(list.length, 1)) * 100 : 100;
+  const sections = useMemo(() => groupSections(questions, new Map(Object.entries(values))), [questions, values]);
+  const sectionStep = Math.min(sectionIndex, Math.max(sections.length - 1, 0));
+  const currentSection = sections[sectionStep];
+  const progress =
+    phase === "welcome" ? 0 : phase === "questions" ? ((wide ? sectionStep + 1 : step + 1) / Math.max(wide ? sections.length : list.length, 1)) * 100 : 100;
 
   useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setWide(media.matches);
+    apply();
+    media.addEventListener("change", apply);
     return () => {
+      media.removeEventListener("change", apply);
       if (timer.current) window.clearTimeout(timer.current);
     };
   }, []);
@@ -115,6 +128,22 @@ export function Typeform({
     return answerProblem(item, value);
   }
 
+  function orderedFrom(latest: Record<string, string>) {
+    const answers = new Map(Object.entries(latest));
+    return [...questions]
+      .filter((item) => questionVisible(item, answers))
+      .sort((left, right) => left.sectionSort - right.sectionSort || left.sort - right.sort);
+  }
+
+  function placeAt(questionId: string, latest: Record<string, string>) {
+    const ordered = orderedFrom(latest);
+    const at = ordered.findIndex((item) => item.id === questionId);
+    if (at >= 0) setIndex(at);
+    const grouped = groupSections(questions, new Map(Object.entries(latest)));
+    const sectionAt = grouped.findIndex((section) => section.questions.some((item) => item.id === questionId));
+    if (sectionAt >= 0) setSectionIndex(sectionAt);
+  }
+
   function goNext(override?: string) {
     if (!question) return;
     const latest = override === undefined ? values : { ...values, [question.id]: override };
@@ -122,19 +151,41 @@ export function Typeform({
     const problem = problemFor(question, value);
     if (problem) {
       setError(problem);
+      setErrorId(question.id);
       return;
     }
     setError("");
-    const answers = new Map(Object.entries(latest));
-    const nextList = [...questions]
-      .filter((item) => questionVisible(item, answers))
-      .sort((left, right) => left.sectionSort - right.sectionSort || left.sort - right.sort);
+    setErrorId("");
+    const nextList = orderedFrom(latest);
     const currentIndex = Math.max(0, nextList.findIndex((item) => item.id === question.id));
     if (currentIndex >= nextList.length - 1) {
       void finish(latest);
       return;
     }
-    setIndex(currentIndex + 1);
+    placeAt(nextList[currentIndex + 1].id, latest);
+  }
+
+  function goSectionNext() {
+    if (!currentSection) return;
+    for (const item of currentSection.questions) {
+      const problem = problemFor(item, values[item.id] ?? "");
+      if (problem) {
+        setError(problem);
+        setErrorId(item.id);
+        document.getElementById(`q-${item.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+    setError("");
+    setErrorId("");
+    void flush();
+    const grouped = groupSections(questions, new Map(Object.entries(values)));
+    if (sectionStep >= grouped.length - 1) {
+      void finish(values);
+      return;
+    }
+    const next = grouped[sectionStep + 1]?.questions[0];
+    if (next) placeAt(next.id, values);
   }
 
   async function finish(latest: Record<string, string>) {
@@ -146,12 +197,8 @@ export function Typeform({
     if (!result.ok) {
       setError(result.error);
       if (result.questionId) {
-        const answers = new Map(Object.entries(latest));
-        const ordered = [...questions]
-          .filter((item) => questionVisible(item, answers))
-          .sort((left, right) => left.sectionSort - right.sectionSort || left.sort - right.sort);
-        const found = ordered.findIndex((item) => item.id === result.questionId);
-        if (found >= 0) setIndex(found);
+        setErrorId(result.questionId);
+        placeAt(result.questionId, latest);
       }
       return;
     }
@@ -159,11 +206,11 @@ export function Typeform({
     setSaveState("saved");
   }
 
-  async function onUpload(list: FileList | null) {
-    if (!question || !list?.length) return;
+  async function onUpload(questionId: string, list: FileList | null) {
+    if (!list?.length) return;
     const body = new FormData();
     body.set("token", token);
-    body.set("questionId", question.id);
+    body.set("questionId", questionId);
     for (const file of list) body.append("file", file);
     setBusy(true);
     const result = await uploadBriefFile(body);
@@ -191,12 +238,9 @@ export function Typeform({
   const started = Object.values(values).some((value) => value.trim());
 
   function begin() {
-    const answers = new Map(Object.entries(values));
-    const ordered = [...questions]
-      .filter((item) => questionVisible(item, answers))
-      .sort((left, right) => left.sectionSort - right.sectionSort || left.sort - right.sort);
+    const ordered = orderedFrom(values);
     const resume = ordered.findIndex((item) => item.required && item.kind !== "FILE" && answerBlank(item.kind, values[item.id] ?? ""));
-    setIndex(resume >= 0 ? resume : 0);
+    placeAt(ordered[resume >= 0 ? resume : 0]?.id ?? "", values);
     setPhase("questions");
   }
 
@@ -207,8 +251,10 @@ export function Typeform({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/magpie-logo-purple.png" alt="Magpie Studio" className="h-9 w-auto" />
           <p className="text-xs font-semibold tracking-wide text-muted">
-            {phase === "questions" && question
-              ? `Question ${step + 1} of ${list.length}`
+            {phase === "questions" && wide && currentSection
+              ? `${currentSection.label} · ${sectionStep + 1} of ${sections.length}`
+              : phase === "questions" && question
+                ? `Question ${step + 1} of ${list.length}`
               : saveState === "saving"
                 ? "Saving…"
                 : saveState === "saved"
@@ -216,7 +262,7 @@ export function Typeform({
                   : "Public link · no login"}
           </p>
         </header>
-        <div className="brief-sheet question-rise" key={phase === "questions" ? question?.id : phase}>
+        <div className="brief-sheet question-rise" key={phase === "questions" ? (wide ? currentSection?.id : question?.id) : phase}>
           {phase === "welcome" ? null : (
             <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-background">
               <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -228,14 +274,51 @@ export function Typeform({
               <h1 className="mt-3 text-3xl font-semibold leading-tight">Your project brief</h1>
               {title ? <p className="mt-4 text-sm font-semibold text-foreground">{title}</p> : null}
               <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-muted">
-                One question at a time. Anyone with this link can answer. There is no account, and you can leave and come back.
+                Anyone with this link can answer. A phone shows one question at a time. A larger screen shows the whole section.
               </p>
               <button type="button" className={`${primaryBtn} mt-8 w-full`} onClick={begin}>
                 {started ? "Continue" : "Start"}
               </button>
             </section>
           ) : null}
-          {phase === "questions" && question ? (
+          {phase === "questions" && wide && currentSection ? (
+            <section className="brief-board text-left">
+              <h1 className="text-center text-2xl font-semibold leading-snug">{currentSection.label}</h1>
+              <div className="mt-8 grid gap-8">
+                {currentSection.questions.map((item) => (
+                  <div key={item.id} id={`q-${item.id}`}>
+                    <h2 className="text-lg font-semibold leading-snug">
+                      {item.label}
+                      {item.required ? <span className="text-accent"> *</span> : null}
+                    </h2>
+                    {item.help ? <p className="mt-1 text-sm leading-6 text-muted">{item.help}</p> : null}
+                    <div className="mt-3">{renderQuestion(item)}</div>
+                    {errorId === item.id ? <p className="mt-2 text-sm font-semibold text-accent-strong">{error}</p> : null}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-8 flex items-center gap-2">
+                {sectionStep > 0 ? (
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    onClick={() => {
+                      const previous = sections[sectionStep - 1]?.questions[0];
+                      if (previous) placeAt(previous.id, values);
+                      setError("");
+                      setErrorId("");
+                    }}
+                  >
+                    Back
+                  </button>
+                ) : null}
+                <button type="button" disabled={busy} className={`${primaryBtn} min-w-0 flex-1`} onClick={goSectionNext}>
+                  {busy ? "Saving…" : sectionStep >= sections.length - 1 ? "Submit" : "Next"}
+                </button>
+              </div>
+            </section>
+          ) : null}
+          {phase === "questions" && !wide && question ? (
             <section className="text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">{question.sectionLabel}</p>
               <h1 className="mt-3 text-2xl font-semibold leading-snug sm:text-3xl">
@@ -251,8 +334,10 @@ export function Typeform({
                     type="button"
                     className={ghostBtn}
                     onClick={() => {
+                      const previous = list[step - 1];
+                      if (previous) placeAt(previous.id, values);
                       setError("");
-                      setIndex(step - 1);
+                      setErrorId("");
                     }}
                   >
                     Back
@@ -298,8 +383,9 @@ export function Typeform({
                       void reopenBriefNow(token).then((result) => {
                         if (!result.ok) setError(result.error);
                         else {
+                          const first = orderedFrom(values)[0];
+                          if (first) placeAt(first.id, values);
                           setPhase("questions");
-                          setIndex(0);
                         }
                       });
                     }}
@@ -332,7 +418,7 @@ export function Typeform({
   );
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (phase !== "questions" || !question) return;
+    if (phase !== "questions" || !question || window.matchMedia("(min-width: 1024px)").matches) return;
     const target = event.target as HTMLElement;
     if (event.key === "Enter" && question.kind !== "LONG" && question.kind !== "URLS" && target.tagName !== "TEXTAREA") {
       event.preventDefault();
@@ -359,7 +445,7 @@ export function Typeform({
           inputMode={item.id === "phone" ? "tel" : undefined}
           placeholder={item.kind === "URL" ? "https://" : ""}
           value={value}
-          autoFocus
+          autoFocus={!wide}
           onChange={(event) => update(item.id, event.target.value)}
         />
       );
@@ -369,7 +455,7 @@ export function Typeform({
     }
     if (item.kind === "DROPDOWN") {
       return (
-        <div className="grid gap-3">
+        <div className={wide ? "grid gap-2 sm:grid-cols-2" : "grid gap-3"}>
           {item.options.map((option, optionIndex) => {
             const selected = value === option;
             return (
@@ -378,7 +464,7 @@ export function Typeform({
                 type="button"
                 onClick={() => {
                   update(item.id, option);
-                  window.setTimeout(() => goNext(option), 180);
+                  if (!window.matchMedia("(min-width: 1024px)").matches) window.setTimeout(() => goNext(option), 180);
                 }}
                 className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left text-base transition ${selected ? "border-accent bg-accent text-white shadow-md shadow-accent/20" : "border-transparent bg-background text-foreground hover:border-accent/30"}`}
               >
@@ -395,7 +481,7 @@ export function Typeform({
     if (item.kind === "MULTI") {
       const selected = parseMulti(value);
       return (
-        <div className="grid gap-3">
+        <div className={wide ? "grid gap-2 sm:grid-cols-2" : "grid gap-3"}>
           {item.options.map((option, optionIndex) => {
             const on = selected.includes(option);
             return (
@@ -479,7 +565,7 @@ export function Typeform({
             multiple
             accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
             onChange={(event) => {
-              void onUpload(event.target.files);
+              void onUpload(item.id, event.target.files);
               event.target.value = "";
             }}
           />

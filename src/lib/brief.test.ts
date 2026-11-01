@@ -3,6 +3,16 @@ import { questionBank } from "../content/questions.ts";
 import { answerBlank, firstProblem, groupSections, questionVisible, type BriefQuestion } from "./brief.ts";
 
 assert.equal(questionBank.length, 50);
+const languages = questionBank.find((question) => question.id === "site-languages");
+assert.equal(languages?.kind, "MULTI");
+assert.equal(languages?.section, "technical");
+for (const name of ["English", "Chinese", "Russian", "French", "Japanese", "Korean"]) {
+  assert.equal(languages?.options.includes(name), true);
+}
+const stack = questionBank.find((question) => question.id === "dev-language");
+assert.equal(stack?.kind, "MULTI");
+assert.equal(stack?.options.includes("Next.js"), true);
+assert.equal(stack?.options.includes("TypeScript"), true);
 assert.equal(new Set(questionBank.map((question) => question.id)).size, 50);
 
 const questions = questionBank.map((question) => ({ ...question, hidden: false })) as BriefQuestion[];

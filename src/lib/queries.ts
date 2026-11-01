@@ -114,6 +114,46 @@ async function loadDesk() {
   });
 
   await ensureQuestions();
+  await refreshUntouchedQuestions();
+}
+
+const retiredChoices: Record<string, { kind: string; options: string[] }> = {
+  "site-languages": { kind: "SHORT", options: [] },
+  "dev-language": {
+    kind: "DROPDOWN",
+    options: ["No preference", "JavaScript or TypeScript", "PHP", "Python", "Java or C#", "Other"],
+  },
+};
+
+function sameList(left: string[], right: string[]) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+async function refreshUntouchedQuestions() {
+  const rows = await prisma.requirementQuestion.findMany({ where: { id: { in: Object.keys(retiredChoices) } } });
+  let changed = false;
+  for (const row of rows) {
+    const previous = retiredChoices[row.id];
+    const seed = questionBank.find((question) => question.id === row.id);
+    if (!previous || !seed) continue;
+    if (row.kind !== previous.kind || !sameList(row.options, previous.options)) continue;
+    await prisma.requirementQuestion.update({
+      where: { id: row.id },
+      data: {
+        section: seed.section,
+        sectionLabel: seed.sectionLabel,
+        sectionSort: seed.sectionSort,
+        sort: seed.sort,
+        label: seed.label,
+        help: seed.help,
+        kind: seed.kind,
+        options: seed.options,
+        types: seed.types,
+      },
+    });
+    changed = true;
+  }
+  if (changed) invalidateQuestionCache();
 }
 
 async function ensureQuestions() {
