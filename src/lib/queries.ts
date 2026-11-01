@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { company, defaultBranch, paymentDefaults } from "@/content/company";
 import { questionBank } from "@/content/questions";
 import { ensurePipelineSamples } from "@/lib/sample-pipeline";
-import { keepDatabaseAwake, prisma } from "@/lib/db";
+import { join, keepDatabaseAwake, prisma } from "@/lib/db";
 import { holdReads, keep, remember } from "@/lib/read-cache";
 import { formatDocumentNumber, invoiceNumberBase, shortNumber, uniqueCode } from "@/lib/contract-number";
 import { ndaBody } from "@/lib/nda-text";
@@ -346,12 +346,12 @@ export function paymentDetailLines(payments: {
 
 export async function getJob(id: string) {
   await ensureDesk();
-  return remember(`job:${id}`, () => prisma.requirement.findUnique({ where: { id }, include: jobInclude }));
+  return remember(`job:${id}`, () => prisma.requirement.findUnique({ ...join, where: { id }, include: jobInclude }));
 }
 
 export async function getJobByToken(shareToken: string) {
   await ensureDesk();
-  return prisma.requirement.findUnique({ where: { shareToken }, include: jobInclude });
+  return prisma.requirement.findUnique({ ...join, where: { shareToken }, include: jobInclude });
 }
 
 export async function getJobByQuotation(id: string) {
@@ -391,13 +391,14 @@ const invoiceInclude = {
 
 export async function getInvoiceRecord(id: string) {
   await ensureDesk();
-  return remember(`invoice:${id}`, () => prisma.invoice.findUnique({ where: { id }, include: invoiceInclude }));
+  return remember(`invoice:${id}`, () => prisma.invoice.findUnique({ ...join, where: { id }, include: invoiceInclude }));
 }
 
 export async function listInvoices() {
   await ensureDesk();
   return remember("invoices", () =>
     prisma.invoice.findMany({
+      ...join,
       orderBy: { updatedAt: "desc" },
       include: invoiceInclude,
     }),
@@ -433,6 +434,7 @@ export async function listRequirements() {
   await ensureDesk();
   return remember("requirements", () =>
     prisma.requirement.findMany({
+      ...join,
       orderBy: { updatedAt: "desc" },
       include: {
         partner: true,
@@ -447,6 +449,7 @@ export async function listPartners() {
   await ensureDesk();
   return remember("partners", () =>
     prisma.partner.findMany({
+      ...join,
       orderBy: { createdAt: "desc" },
       include: {
         requirements: {
@@ -463,6 +466,7 @@ export async function getPartner(id: string) {
   await ensureDesk();
   return remember(`partner:${id}`, () =>
     prisma.partner.findUnique({
+      ...join,
       where: { id },
       include: {
         requirements: {
@@ -500,6 +504,7 @@ export async function listQuotations() {
   await ensureDesk();
   return remember("quotations", () =>
     prisma.quotation.findMany({
+      ...join,
       orderBy: { updatedAt: "desc" },
       include: {
         lines: { orderBy: { sort: "asc" } },
@@ -513,6 +518,7 @@ export async function getQuotationPage(id: string) {
   await ensureDesk();
   return remember(`quotation:${id}`, () =>
     prisma.quotation.findUnique({
+      ...join,
       where: { id },
       include: {
         lines: { orderBy: { sort: "asc" } },
@@ -529,9 +535,10 @@ export async function warmDeskReads() {
 
 async function loadDeskReads() {
   const [jobs, invoices, quotations, partners, notices, payments, banks] = await Promise.all([
-    prisma.requirement.findMany({ orderBy: { updatedAt: "desc" }, include: jobInclude }),
-    prisma.invoice.findMany({ orderBy: { updatedAt: "desc" }, include: invoiceInclude }),
+    prisma.requirement.findMany({ ...join, orderBy: { updatedAt: "desc" }, include: jobInclude }),
+    prisma.invoice.findMany({ ...join, orderBy: { updatedAt: "desc" }, include: invoiceInclude }),
     prisma.quotation.findMany({
+      ...join,
       orderBy: { updatedAt: "desc" },
       include: {
         lines: { orderBy: { sort: "asc" } },
@@ -540,6 +547,7 @@ async function loadDeskReads() {
       },
     }),
     prisma.partner.findMany({
+      ...join,
       orderBy: { createdAt: "desc" },
       include: {
         requirements: {
@@ -619,6 +627,7 @@ export async function getContractPage(id: string) {
   await ensureDesk();
   return remember(`contract:${id}`, () =>
     prisma.contract.findUnique({
+      ...join,
       where: { id },
       include: {
         invoice: { select: { id: true, number: true } },
