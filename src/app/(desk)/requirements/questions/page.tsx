@@ -1,6 +1,8 @@
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { Banner, PageTitle } from "@/components/desk/DeskShell";
 import { Button } from "@/components/ui/Button";
 import { saveQuestions } from "@/lib/brief-actions";
+import { deleteQuestion } from "@/lib/mutations";
 import { listQuestions } from "@/lib/queries";
 
 const kindLabel: Record<string, string> = {
@@ -78,10 +80,13 @@ export default async function QuestionEditorPage({
                       {question.locked ? (
                         <p className="mt-3 text-xs leading-5 text-gray-500">This one stays on the form so the next section still appears.</p>
                       ) : (
-                        <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-                          <input type="checkbox" name={`hidden_${question.id}`} value="yes" defaultChecked={question.hidden} className="size-4 rounded border-gray-300" />
-                          Hide
-                        </label>
+                        <div className="mt-3 flex items-center gap-4">
+                          <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name={`hidden_${question.id}`} value="yes" defaultChecked={question.hidden} className="size-4 rounded border-gray-300" />
+                            Hide
+                          </label>
+                          <DeleteButton action={deleteQuestion} id={question.id} formId={`delete-${question.id}`} confirmText={`Delete “${question.label}”?`} />
+                        </div>
                       )}
                     </div>
                     <div className="grid gap-3">
@@ -121,6 +126,13 @@ export default async function QuestionEditorPage({
           </Button>
         </div>
       </form>
+      {questions
+        .filter((question) => !question.locked)
+        .map((question) => (
+          <form key={question.id} id={`delete-${question.id}`} action={deleteQuestion}>
+            <input type="hidden" name="id" value={question.id} />
+          </form>
+        ))}
     </>
   );
 }

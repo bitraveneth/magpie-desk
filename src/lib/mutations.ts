@@ -10,6 +10,7 @@ import { ndaBody } from "@/lib/nda-text";
 import {
   contractCompanyName,
   ensureDesk,
+  invalidateQuestionCache,
   getCompany,
   warmDeskReads,
   takeDocumentNumber,
@@ -657,6 +658,86 @@ export async function useBankAccount(formData: FormData) {
   await prisma.bankAccount.update({ where: { id }, data: { isDefault: true } });
   await copyBankToSettings(account);
   done("/settings/payments", "Invoices will use this bank account.");
+}
+
+async function detachInvoice(contractId: string) {
+  await prisma.invoice.updateMany({ where: { contractId }, data: { contractId: null } });
+}
+
+export async function deleteInvoice(formData: FormData) {
+  const id = text(formData, "id");
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice) fail("/invoices", "Invoice not found.");
+  await prisma.invoice.delete({ where: { id } });
+  done("/invoices", "Invoice deleted.");
+}
+
+export async function deleteContract(formData: FormData) {
+  const id = text(formData, "id");
+  const contract = await prisma.contract.findUnique({ where: { id } });
+  if (!contract) fail("/contracts", "Contract not found.");
+  await detachInvoice(id);
+  await prisma.contract.delete({ where: { id } });
+  done("/contracts", "Contract deleted.");
+}
+
+export async function deleteQuotation(formData: FormData) {
+  const id = text(formData, "id");
+  const quotation = await prisma.quotation.findUnique({
+    where: { id },
+    include: { contract: true, requirement: true },
+  });
+  if (!quotation) fail("/quotations", "Quotation not found.");
+  if (quotation.contract) await detachInvoice(quotation.contract.id);
+  const openedFromDesk = quotation.requirement.summary === "Opened from the quotations desk.";
+  await prisma.quotation.delete({ where: { id } });
+  if (openedFromDesk) await prisma.requirement.delete({ where: { id: quotation.requirementId } });
+  done("/quotations", "Quotation deleted.");
+}
+
+export async function deleteRequirement(formData: FormData) {
+  const id = text(formData, "id");
+  const job = await prisma.requirement.findUnique({
+    where: { id },
+    include: { quotation: { include: { contract: true } } },
+  });
+  if (!job) fail("/requirements", "Requirement not found.");
+  if (job.quotation?.contract) await detachInvoice(job.quotation.contract.id);
+  await prisma.requirement.delete({ where: { id } });
+  done("/requirements", "Requirement deleted.");
+}
+
+export async function deleteQuestion(formData: FormData) {
+  const id = text(formData, "id");
+  const question = await prisma.requirementQuestion.findUnique({ where: { id } });
+  if (!question) fail("/requirements/questions", "Question not found.");
+  if (question.locked) fail("/requirements/questions", "This question stays. The form needs it.");
+  await prisma.requirementQuestion.delete({ where: { id } });
+  invalidateQuestionCache();
+  done("/requirements/questions", "Question deleted.");
+}
+
+export async function deleteBankAccount(formData: FormData) {
+  const id = text(formData, "id");
+  const account = await prisma.bankAccount.findUnique({ where: { id } });
+  if (!account) fail("/settings/payments", "Bank account not found.");
+  await prisma.bankAccount.delete({ where: { id } });
+  if (account.isDefault) {
+    const next = await prisma.bankAccount.findFirst({ orderBy: { createdAt: "asc" } });
+    if (next) {
+      await prisma.bankAccount.update({ where: { id: next.id }, data: { isDefault: true } });
+      await copyBankToSettings(next);
+    }
+  }
+  done("/settings/payments", "Bank account deleted.");
+}
+
+export async function deletePartner(formData: FormData) {
+  const id = text(formData, "id");
+  const partner = await prisma.partner.findUnique({ where: { id } });
+  if (!partner) fail("/partners", "Partner not found.");
+  await prisma.partner.delete({ where: { id } });
+  done("/partners", "Partner deleted.");
 }
 
 export async function createPartner(formData: FormData) {

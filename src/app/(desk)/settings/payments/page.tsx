@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Banner, PageTitle } from "@/components/desk/DeskShell";
-import { addBankAccount, savePayments, useBankAccount } from "@/lib/mutations";
+import { addBankAccount, deleteBankAccount, savePayments, useBankAccount } from "@/lib/mutations";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { getPayments, listBankAccounts } from "@/lib/queries";
 
 const fieldClass = "h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-brand-500";
@@ -58,14 +59,17 @@ export default async function PaymentsPage({
                 <dd className="legal-zh mt-1 leading-6 text-gray-800">{payments.address}</dd>
               </div>
             </dl>
-            {account.isDefault ? null : (
-              <form action={useBankAccount} className="border-t border-gray-100 px-6 py-4">
-                <input type="hidden" name="id" value={account.id} />
-                <Button type="submit" variant="outline" className="px-3 py-2">
-                  Use on invoices
-                </Button>
-              </form>
-            )}
+            <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-6 py-4">
+              {account.isDefault ? <span /> : (
+                <form action={useBankAccount}>
+                  <input type="hidden" name="id" value={account.id} />
+                  <Button type="submit" variant="outline" className="px-3 py-2">
+                    Use on invoices
+                  </Button>
+                </form>
+              )}
+              <DeleteButton action={deleteBankAccount} id={account.id} confirmText={`Delete the ${account.bankName} account?`} />
+            </div>
           </article>
         ))}
         <article className="rounded-2xl border border-dashed border-gray-300 bg-white p-6">

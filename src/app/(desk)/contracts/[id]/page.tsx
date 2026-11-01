@@ -5,7 +5,8 @@ import { Banner, StatusBadge } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
 import { PaperSheet } from "@/components/desk/PaperSheet";
 import { company } from "@/content/company";
-import { createInvoice, saveContract, signContract } from "@/lib/mutations";
+import { createInvoice, deleteContract, saveContract, signContract } from "@/lib/mutations";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { shanghaiDate, shanghaiDay } from "@/lib/money";
 import { getContractPage, getPayments } from "@/lib/queries";
 
@@ -33,6 +34,7 @@ export default async function ContractPage({
           <Button href={`/contracts/${contract.id}/pdf`} variant="outline" className="px-4 py-2">
             Download PDF
           </Button>
+          <DeleteButton action={deleteContract} id={contract.id} confirmText={`Delete contract ${contract.number}? The invoice stays.`} />
         </div>
         {signed ? (
           contract.invoice ? (

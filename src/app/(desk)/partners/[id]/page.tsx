@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { Banner, Field, PageTitle, SampleNote } from "@/components/desk/DeskShell";
 import { CopyLink } from "@/components/desk/CopyLink";
 import { commissionTotals } from "@/lib/commission";
-import { updatePartner } from "@/lib/mutations";
+import { DeleteButton } from "@/components/desk/DeleteButton";
+import { deletePartner, updatePartner } from "@/lib/mutations";
 import { money, sumLines } from "@/lib/money";
 import { getPartner, origin } from "@/lib/queries";
 
@@ -29,9 +30,10 @@ export default async function PartnerDetailPage({
     <>
       <PageTitle kicker="Partner" title={partner.name} text="Share this link when the lead comes from this partner. Each requirement still gets its own link to send." />
       <Banner error={messages.error} notice={messages.notice} />
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <SampleNote sample={partner.sample} />
         <Badge>{partner.commissionRate == null ? "Rate not set" : `${Number(partner.commissionRate)}%`}</Badge>
+        <DeleteButton action={deletePartner} id={partner.id} confirmText={`Delete partner ${partner.name}? Their requirements stay.`} />
       </div>
       <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="grid gap-6">

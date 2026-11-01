@@ -7,7 +7,8 @@ import { LineEditor } from "@/components/desk/LineEditor";
 import { PaperSheet } from "@/components/desk/PaperSheet";
 import { company, quoteTemplates } from "@/content/company";
 import { companyPrefix, shanghaiStamp } from "@/lib/contract-number";
-import { applyQuoteTemplate, createContract, setQuotationStatus, saveQuotation } from "@/lib/mutations";
+import { applyQuoteTemplate, createContract, deleteQuotation, setQuotationStatus, saveQuotation } from "@/lib/mutations";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { money, shanghaiDay } from "@/lib/money";
 import { contractCompanyName, getPayments, getQuotationPage } from "@/lib/queries";
 
@@ -36,6 +37,7 @@ export default async function QuotationPage({
           <Button href={`/quotations/${quotation.id}/pdf`} variant="outline" className="px-4 py-2">
             Download PDF
           </Button>
+          <DeleteButton action={deleteQuotation} id={quotation.id} confirmText={`Delete quotation ${quotation.number}? The invoice stays.`} />
         </div>
         <Link href="/quotations/new" className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">
           New quotation

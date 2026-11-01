@@ -3,7 +3,9 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Banner, PageTitle, SampleNote } from "@/components/desk/DeskShell";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { commissionTotals } from "@/lib/commission";
+import { deletePartner } from "@/lib/mutations";
 import { money } from "@/lib/money";
 import { listPartners, origin } from "@/lib/queries";
 
@@ -52,9 +54,12 @@ export default async function PartnersPage({
                       : "Set a rate to calculate commission"}
                   </p>
                 </div>
-                <Button href={`/partners/${partner.id}`} variant="outline">
-                  Open
-                </Button>
+                <div className="flex items-center gap-4">
+                  <Button href={`/partners/${partner.id}`} variant="outline">
+                    Open
+                  </Button>
+                  <DeleteButton action={deletePartner} id={partner.id} confirmText={`Delete partner ${partner.name}? Their requirements stay.`} />
+                </div>
               </div>
             </Card>
           );

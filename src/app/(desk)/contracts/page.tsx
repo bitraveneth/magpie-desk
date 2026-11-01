@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { PageTitle, StatusBadge } from "@/components/desk/DeskShell";
+import { deleteContract } from "@/lib/mutations";
 import { listRequirements } from "@/lib/queries";
 import { shanghaiDate } from "@/lib/money";
 
@@ -56,6 +58,9 @@ export default async function ContractsPage() {
                         <Link href={`/contracts/${contract.id}/pdf`} className="ml-4 text-brand-500 hover:text-brand-600">
                           PDF
                         </Link>
+                        <span className="ml-4">
+                          <DeleteButton action={deleteContract} id={contract.id} confirmText={`Delete contract ${contract.number}? The invoice stays.`} />
+                        </span>
                       </td>
                     </tr>
                   );

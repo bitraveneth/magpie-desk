@@ -6,7 +6,8 @@ import { CopyLink } from "@/components/desk/CopyLink";
 import { quoteTemplates } from "@/content/company";
 import { company } from "@/content/company";
 import { deskStatus } from "@/lib/brief";
-import { createQuotation, offerNda, confirmRequirement, returnForCorrection, updateRequirement } from "@/lib/mutations";
+import { createQuotation, deleteRequirement, offerNda, confirmRequirement, returnForCorrection, updateRequirement } from "@/lib/mutations";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { markRequirementNoticesRead } from "@/lib/notices";
 import { answeredSections } from "@/lib/requirement-document";
 import { getJob, listQuestions, origin } from "@/lib/queries";
@@ -46,6 +47,7 @@ export default async function RequirementDetailPage({
           <Button href={link} variant="outline" className="px-4 py-2">
             Open link
           </Button>
+          <DeleteButton action={deleteRequirement} id={job.id} confirmText={`Delete requirement ${job.number}? Its quotation and contract go with it. The invoice stays.`} />
         </div>
       </div>
       <Banner error={messages.error} notice={messages.notice} />

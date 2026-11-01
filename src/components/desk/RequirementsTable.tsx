@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { StatusBadge } from "@/components/desk/DeskShell";
+import { deleteRequirement } from "@/lib/mutations";
 import { deskStatus } from "@/lib/brief";
 import { shanghaiDate } from "@/lib/money";
 
@@ -69,6 +71,9 @@ export function RequirementsTable({ jobs, empty }: { jobs: Row[]; empty?: string
                   <Link href={`/requirements/${job.id}/pdf`} className="ml-4 text-brand-500 hover:text-brand-600">
                     PDF
                   </Link>
+                  <span className="ml-4">
+                    <DeleteButton action={deleteRequirement} id={job.id} confirmText={`Delete requirement ${job.number}? Its quotation and contract go with it. The invoice stays.`} />
+                  </span>
                 </td>
               </tr>
             ))

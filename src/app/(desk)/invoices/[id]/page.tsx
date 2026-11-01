@@ -5,7 +5,8 @@ import { Banner, StatusBadge } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
 import { InvoiceEditor } from "@/components/desk/InvoiceEditor";
 import { company } from "@/content/company";
-import { issueInvoice, markInvoicePaid, saveInvoice, setPaymentMethod } from "@/lib/mutations";
+import { deleteInvoice, issueInvoice, markInvoicePaid, saveInvoice, setPaymentMethod } from "@/lib/mutations";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { shanghaiDay } from "@/lib/money";
 import { getInvoiceRecord, getPayments, invoiceParties } from "@/lib/queries";
 
@@ -33,6 +34,7 @@ export default async function InvoicePage({
           <Button href={`/invoices/${invoice.id}/pdf`} variant="outline" className="px-4 py-2">
             Download PDF
           </Button>
+          <DeleteButton action={deleteInvoice} id={invoice.id} confirmText={`Delete invoice ${invoice.number}?`} />
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/invoices/new" className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">

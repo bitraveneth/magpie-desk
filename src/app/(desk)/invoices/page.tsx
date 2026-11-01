@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { PageTitle, StatusBadge } from "@/components/desk/DeskShell";
+import { deleteInvoice } from "@/lib/mutations";
 import { money, shanghaiDate, sumLines } from "@/lib/money";
 import { invoiceParties, listInvoices } from "@/lib/queries";
 
@@ -96,6 +98,9 @@ export default async function InvoicesPage({
                         <Link href={`/invoices/${invoice.id}/pdf`} className="ml-4 text-brand-500 hover:text-brand-600">
                           PDF
                         </Link>
+                        <span className="ml-4">
+                          <DeleteButton action={deleteInvoice} id={invoice.id} confirmText={`Delete invoice ${invoice.number}?`} />
+                        </span>
                       </td>
                     </tr>
                   );

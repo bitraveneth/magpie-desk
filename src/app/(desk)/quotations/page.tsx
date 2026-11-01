@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { DeleteButton } from "@/components/desk/DeleteButton";
 import { PageTitle, StatusBadge } from "@/components/desk/DeskShell";
+import { deleteQuotation } from "@/lib/mutations";
 import { money, shanghaiDate, sumLines } from "@/lib/money";
 import { listQuotations } from "@/lib/queries";
 
@@ -62,6 +64,9 @@ export default async function QuotationsPage() {
                       <Link href={`/quotations/${quotation.id}/pdf`} className="ml-4 text-brand-500 hover:text-brand-600">
                         PDF
                       </Link>
+                      <span className="ml-4">
+                        <DeleteButton action={deleteQuotation} id={quotation.id} confirmText={`Delete quotation ${quotation.number}? The invoice stays.`} />
+                      </span>
                     </td>
                   </tr>
                 ))
