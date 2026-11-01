@@ -7,8 +7,8 @@ import { company, paymentDefaults } from "@/content/company";
 const pageWidth = 595.28;
 const pageHeight = 841.89;
 const margin = 48;
-const footerBand = 108;
-const contentFloor = 126;
+const footerBand = 96;
+const contentFloor = 112;
 const accentStrong = rgb(0.29, 0.141, 0.463);
 const ink = rgb(0.059, 0.059, 0.059);
 const muted = rgb(0.42, 0.396, 0.376);
@@ -294,58 +294,58 @@ function drawMasthead(pen: Pen, first: boolean) {
   pen.y = pageHeight - 60;
 }
 
-function footerAddressLines(address: string, width: number, latin: PDFFont, cjk: PDFFont | null): string[] {
-  const splitAt = address.indexOf(" ");
-  const phrases = splitAt > 8 ? [address.slice(0, splitAt), address.slice(splitAt + 1)] : [address];
-  return phrases.flatMap((phrase) => wrapParagraph(phrase, 8, width, latin, cjk)).slice(0, 3);
+function ribbonIcon(page: PDFPage, kind: "company" | "pin" | "phone", x: number, top: number) {
+  const paths = {
+    company: "M 1.5 11 V 4.5 H 4 V 1.5 H 8 V 4.5 H 10.5 V 11 Z M 4.6 11 V 7.6 H 7.4 V 11",
+    pin: "M 6 11.2 C 6 11.2 1.2 7 1.2 4.4 A 4.8 4.8 0 1 1 10.8 4.4 C 10.8 7 6 11.2 6 11.2 Z",
+    phone: "M 3.2 1.4 H 8.8 A 1 1 0 0 1 9.8 2.4 V 9.8 A 1 1 0 0 1 8.8 10.8 H 3.2 A 1 1 0 0 1 2.2 9.8 V 2.4 A 1 1 0 0 1 3.2 1.4 Z M 5 8.8 H 7",
+  };
+  page.drawSvgPath(paths[kind], {
+    x,
+    y: top,
+    borderColor: white,
+    borderWidth: 0.9,
+  });
+  if (kind === "pin") {
+    page.drawCircle({ x: x + 6, y: top - 4.6, size: 1.15, borderColor: white, borderWidth: 0.8 });
+  }
 }
 
 function drawFooter(pen: Pen, page: PDFPage, index: number, total: number) {
-  const bar = 20;
-  page.drawRectangle({ x: 0, y: bar, width: pageWidth, height: footerBand - bar, color: cream });
-  page.drawRectangle({ x: 0, y: footerBand - 3, width: pageWidth, height: 3, color: accent });
-  page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: bar, color: accentStrong });
-
-  const columns = [
-    { x: 36, width: 176 },
-    { x: 224, width: 196 },
-    { x: 432, width: 128 },
-  ];
-  for (const edge of [216, 424]) {
-    page.drawLine({
-      start: { x: edge, y: 34 },
-      end: { x: edge, y: footerBand - 16 },
-      thickness: 0.6,
-      color: rule,
-    });
-  }
-
-  const phone = displayPhone(pen.footer.phone);
-  const blocks = [
-    { label: "COMPANY", lines: [pen.footer.companyName, pen.footer.nameEn] },
-    { label: "ADDRESS", lines: footerAddressLines(pen.footer.address, columns[1].width, pen.latin, pen.cjk) },
-    { label: "PHONE", lines: [phone, company.email] },
-  ];
-  blocks.forEach((block, blockIndex) => {
-    const column = columns[blockIndex];
-    drawAt(page, block.label, column.x, 86, 7, pen.bold, pen.cjk, accent);
-    block.lines.forEach((line, lineIndex) => {
-      const size = lineIndex === 0 ? 9 : 8;
-      const font = lineIndex === 0 ? pen.bold : pen.latin;
-      const color = lineIndex === 0 ? ink : muted;
-      wrapParagraph(line, size, column.width, font, pen.cjk)
-        .slice(0, 2)
-        .forEach((text, wrapIndex) => {
-          drawAt(page, text, column.x, 70 - lineIndex * 14 - wrapIndex * 11, size, font, pen.cjk, color);
-        });
-    });
+  const left = 32;
+  const width = pageWidth - 64;
+  const top = 90;
+  page.drawSvgPath("M 14 62 L 26 52 L 26 74 L 14 66 Z", { x: left, y: top, color: accentStrong });
+  page.drawSvgPath(`M 16 0 L ${width - 16} 0 L ${width + 6} 32 L ${width - 16} 64 L 16 64 L -6 32 Z`, {
+    x: left,
+    y: top,
+    color: accent,
   });
 
-  const label = `${index + 1}  /  ${total}`;
-  const labelWidth = pen.latin.widthOfTextAtSize(label, 8);
+  const phone = displayPhone(pen.footer.phone);
+  const textLeft = left + 40;
+  const textRight = left + width - 28;
+  const splitAt = pen.footer.address.indexOf(" ");
+  const addressLines =
+    splitAt > 8
+      ? [pen.footer.address.slice(0, splitAt), pen.footer.address.slice(splitAt + 1)]
+      : wrapParagraph(pen.footer.address, 8, textRight - textLeft, pen.latin, pen.cjk).slice(0, 2);
+
+  ribbonIcon(page, "company", left + 18, top - 12);
+  drawAt(page, pen.footer.companyName, textLeft, top - 22, 9, pen.bold, pen.cjk, white);
+  const phoneWidth = widthOf(phone, 9, pen.bold, pen.cjk);
+  ribbonIcon(page, "phone", textRight - phoneWidth - 20, top - 12);
+  drawAt(page, phone, textRight - phoneWidth, top - 22, 9, pen.bold, pen.cjk, white);
+
+  ribbonIcon(page, "pin", left + 18, top - 36);
+  addressLines.forEach((line, lineIndex) => {
+    drawAt(page, line, textLeft, top - 46 - lineIndex * 12, 8, pen.latin, pen.cjk, white);
+  });
+
+  const label = `${index + 1} / ${total}`;
   page.drawText(label, {
-    x: (pageWidth - labelWidth) / 2,
-    y: 6,
+    x: textRight - pen.latin.widthOfTextAtSize(label, 8),
+    y: top - 56,
     size: 8,
     font: pen.latin,
     color: white,
