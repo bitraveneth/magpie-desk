@@ -11,6 +11,7 @@ import {
   contractCompanyName,
   ensureDesk,
   getCompany,
+  warmDeskReads,
   takeDocumentNumber,
   takeInvoiceNumber,
   takeShareToken,
@@ -23,6 +24,7 @@ function fail(path: string, message: string): never {
 
 function done(path: string, notice: string): never {
   forgetReads();
+  void warmDeskReads();
   revalidatePath("/", "layout");
   redirect(`${path}?notice=${encodeURIComponent(notice)}`);
 }

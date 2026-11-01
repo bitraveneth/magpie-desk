@@ -2,8 +2,8 @@ import { headers } from "next/headers";
 import { company, defaultBranch, paymentDefaults } from "@/content/company";
 import { questionBank } from "@/content/questions";
 import { ensurePipelineSamples } from "@/lib/sample-pipeline";
-import { prisma } from "@/lib/db";
-import { remember } from "@/lib/read-cache";
+import { keepDatabaseAwake, prisma } from "@/lib/db";
+import { holdReads, keep, remember } from "@/lib/read-cache";
 import { formatDocumentNumber, invoiceNumberBase, shortNumber, uniqueCode } from "@/lib/contract-number";
 import { ndaBody } from "@/lib/nda-text";
 
@@ -36,29 +36,35 @@ export async function origin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-let deskReady = false;
-let deskPromise: Promise<void> | null = null;
-let questionCache: Awaited<ReturnType<typeof prisma.requirementQuestion.findMany>> | null = null;
-let questionCachedAt = 0;
+const globalForDesk = globalThis as unknown as {
+  deskReady?: boolean;
+  deskPromise?: Promise<void> | null;
+  questionCache?: Awaited<ReturnType<typeof prisma.requirementQuestion.findMany>> | null;
+  questionCachedAt?: number;
+};
+let questionCache: Awaited<ReturnType<typeof prisma.requirementQuestion.findMany>> | null = globalForDesk.questionCache ?? null;
+let questionCachedAt = globalForDesk.questionCachedAt ?? 0;
 
 export function invalidateQuestionCache() {
   questionCache = null;
   questionCachedAt = 0;
+  globalForDesk.questionCache = null;
+  globalForDesk.questionCachedAt = 0;
 }
 
 export async function ensureDesk() {
-  if (deskReady) return;
-  if (!deskPromise) {
-    deskPromise = loadDesk()
+  if (globalForDesk.deskReady) return;
+  if (!globalForDesk.deskPromise) {
+    globalForDesk.deskPromise = loadDesk()
       .then(() => {
-        deskReady = true;
+        globalForDesk.deskReady = true;
       })
       .catch((error: unknown) => {
-        deskPromise = null;
+        globalForDesk.deskPromise = null;
         throw error;
       });
   }
-  await deskPromise;
+  await globalForDesk.deskPromise;
 }
 
 async function loadDesk() {
@@ -115,6 +121,8 @@ async function loadDesk() {
   await refreshUntouchedQuestions();
   await syncQuestionPath();
   await ensurePipelineSamples();
+  keepDatabaseAwake();
+  await warmDeskReads();
 }
 
 async function syncQuestionPath() {
@@ -246,6 +254,8 @@ export async function listQuestions() {
     orderBy: [{ sectionSort: "asc" }, { sort: "asc" }],
   });
   questionCachedAt = Date.now();
+  globalForDesk.questionCache = questionCache;
+  globalForDesk.questionCachedAt = questionCachedAt;
   return questionCache;
 }
 
@@ -451,17 +461,19 @@ export async function listPartners() {
 
 export async function getPartner(id: string) {
   await ensureDesk();
-  return prisma.partner.findUnique({
-    where: { id },
-    include: {
-      requirements: {
-        orderBy: { updatedAt: "desc" },
-        include: {
-          quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+  return remember(`partner:${id}`, () =>
+    prisma.partner.findUnique({
+      where: { id },
+      include: {
+        requirements: {
+          orderBy: { updatedAt: "desc" },
+          include: {
+            quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+          },
         },
       },
-    },
-  });
+    }),
+  );
 }
 
 export async function getPartnerByCode(code: string) {
@@ -509,6 +521,98 @@ export async function getQuotationPage(id: string) {
       },
     }),
   );
+}
+
+export async function warmDeskReads() {
+  return holdReads(loadDeskReads());
+}
+
+async function loadDeskReads() {
+  const [jobs, invoices, quotations, partners, notices, payments, banks] = await Promise.all([
+    prisma.requirement.findMany({ orderBy: { updatedAt: "desc" }, include: jobInclude }),
+    prisma.invoice.findMany({ orderBy: { updatedAt: "desc" }, include: invoiceInclude }),
+    prisma.quotation.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: {
+        lines: { orderBy: { sort: "asc" } },
+        requirement: true,
+        contract: { include: { invoice: { select: { id: true, number: true } } } },
+      },
+    }),
+    prisma.partner.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        requirements: {
+          orderBy: { updatedAt: "desc" },
+          include: {
+            quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+          },
+        },
+      },
+    }),
+    prisma.deskNotice.findMany({
+      where: { readAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { requirement: { select: { id: true, title: true, number: true } } },
+    }),
+    ensurePaymentDefaults(),
+    prisma.bankAccount.findMany({ orderBy: { createdAt: "asc" } }),
+  ]);
+
+  keep("requirements", jobs);
+  for (const job of jobs) {
+    keep(`job:${job.id}`, job);
+    const quotation = job.quotation;
+    const contract = quotation?.contract;
+    if (quotation && contract) {
+      keep(`contract:${contract.id}`, {
+        ...contract,
+        quotation: {
+          id: quotation.id,
+          requirement: {
+            id: job.id,
+            number: job.number,
+            clientName: job.clientName,
+            clientCompany: job.clientCompany,
+            title: job.title,
+          },
+        },
+      });
+    }
+  }
+  keep("invoices", invoices);
+  for (const invoice of invoices) keep(`invoice:${invoice.id}`, invoice);
+  keep("quotations", quotations);
+  for (const quotation of quotations) keep(`quotation:${quotation.id}`, quotation);
+  keep("partners", partners);
+  for (const partner of partners) keep(`partner:${partner.id}`, partner);
+  keep("notices", notices);
+  keep("payments", payments);
+
+  let bankRows = banks;
+  const combined = bankRows.find((account) => account.bankName === "平安银行深圳新城支行" && !account.branchName);
+  if (combined) {
+    const fixed = await prisma.bankAccount.update({
+      where: { id: combined.id },
+      data: { bankName: defaultBranch.bankName, branchName: defaultBranch.branchName },
+    });
+    bankRows = bankRows.map((account) => (account.id === fixed.id ? fixed : account));
+  }
+  if (bankRows.length === 0) {
+    bankRows = [
+      await prisma.bankAccount.create({
+        data: {
+          bankName: defaultBranch.bankName,
+          branchName: defaultBranch.branchName,
+          accountName: payments.accountName || paymentDefaults.accountName,
+          accountNumber: payments.accountNumber || paymentDefaults.accountNumber,
+          isDefault: true,
+        },
+      }),
+    ];
+  }
+  keep("banks", bankRows);
 }
 
 export async function getContractPage(id: string) {
