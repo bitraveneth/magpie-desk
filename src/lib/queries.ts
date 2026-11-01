@@ -3,7 +3,7 @@ import { company, paymentDefaults } from "@/content/company";
 import { questionBank } from "@/content/questions";
 import { ensurePipelineSamples } from "@/lib/sample-pipeline";
 import { prisma } from "@/lib/db";
-import { formatDocumentNumber, shortNumber, uniqueCode } from "@/lib/contract-number";
+import { formatDocumentNumber, invoiceNumberBase, shortNumber, uniqueCode } from "@/lib/contract-number";
 import { ndaBody } from "@/lib/nda-text";
 
 const jobInclude = {
@@ -290,8 +290,51 @@ export async function getJobByInvoice(id: string) {
     where: { id },
     select: { contract: { select: { quotation: { select: { requirementId: true } } } } },
   });
-  if (!invoice) return null;
+  if (!invoice?.contract) return null;
   return getJob(invoice.contract.quotation.requirementId);
+}
+
+const invoiceInclude = {
+  lines: { orderBy: { sort: "asc" as const } },
+  contract: { include: { quotation: { include: { requirement: true } } } },
+} as const;
+
+export async function getInvoiceRecord(id: string) {
+  await ensureDesk();
+  return prisma.invoice.findUnique({ where: { id }, include: invoiceInclude });
+}
+
+export async function listInvoices() {
+  await ensureDesk();
+  return prisma.invoice.findMany({
+    orderBy: { updatedAt: "desc" },
+    include: invoiceInclude,
+  });
+}
+
+export async function takeInvoiceNumber(otherCompany: string) {
+  await ensureDesk();
+  const base = invoiceNumberBase(otherCompany, new Date());
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const number = attempt === 0 ? base : `${base}-${attempt + 1}`;
+    const existing = await prisma.invoice.findUnique({ where: { number } });
+    if (!existing) return number;
+  }
+  return `${base}-${uniqueCode(4)}`;
+}
+
+export function invoiceParties(invoice: {
+  clientName: string;
+  clientCompany: string;
+  title: string;
+  contract: { quotation: { requirement: { clientName: string; clientCompany: string; title: string } } } | null;
+}) {
+  const job = invoice.contract?.quotation.requirement;
+  return {
+    clientName: invoice.clientName || job?.clientName || "",
+    clientCompany: invoice.clientCompany || job?.clientCompany || "",
+    title: invoice.title || job?.title || "",
+  };
 }
 
 export async function listRequirements() {

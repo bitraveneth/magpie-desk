@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { companyPrefix, formatDocumentNumber, shanghaiStamp, shortNumber } from "./contract-number.ts";
+import { companyPrefix, formatDocumentNumber, invoiceNumberBase, shanghaiStamp, shortNumber } from "./contract-number.ts";
 
 const when = new Date("2026-11-01T02:30:00.000Z");
 
@@ -21,5 +21,8 @@ assert.equal(
   "NDA-SAMPLE-STUDIO-2026-1101-3Q9P",
 );
 assert.equal(shortNumber("REQ", when, "A1B2"), "REQ-2026-1101-A1B2");
+assert.equal(invoiceNumberBase("", when), "MS20261101");
+assert.equal(invoiceNumberBase("Kite Travel", when), "MS20261101-KITE-TRAVEL");
+assert.equal(invoiceNumberBase("深圳市喜鹊派科技有限公司", when), "MS20261101");
 
 console.log("contract number format ok");

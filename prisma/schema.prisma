@@ -216,8 +216,12 @@ model Contract {
 model Invoice {
   id            String         @id @default(cuid())
   number        String         @unique
-  contractId    String         @unique
-  contract      Contract       @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contractId    String?        @unique
+  contract      Contract?      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  purpose       String         @default("WEB")
+  clientName    String         @default("")
+  clientCompany String         @default("")
+  title         String         @default("")
   currency      String
   status        InvoiceStatus  @default(DRAFT)
   paymentMethod PaymentMethod?

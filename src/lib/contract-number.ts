@@ -58,3 +58,23 @@ export function shortNumber(prefix: "REQ" | "QUO" | "INV", when: Date, unique: s
   const { year, date } = shanghaiStamp(when);
   return `${prefix}-${year}-${date}-${unique}`;
 }
+
+/** First two Latin words of the other company, such as KITE-TRAVEL. */
+export function otherCompanyCode(companyName: string): string {
+  const words = companyName
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter((word) => word.length > 0 && !SKIP.has(word));
+  if (words.length === 0) return "";
+  const first = words[0].slice(0, 12);
+  const second = words[1]?.slice(0, 12);
+  return second ? `${first}-${second}` : first;
+}
+
+/** MS20261119, or MS20261119-KITE-TRAVEL when the other company has Latin words. */
+export function invoiceNumberBase(otherCompany: string, when: Date): string {
+  const { year, date } = shanghaiStamp(when);
+  const head = `MS${year}${date}`;
+  const other = otherCompanyCode(otherCompany);
+  return other ? `${head}-${other}` : head;
+}

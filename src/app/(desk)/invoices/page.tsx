@@ -1,23 +1,60 @@
 import Link from "next/link";
 import { PageTitle, StatusBadge } from "@/components/desk/DeskShell";
 import { money, shanghaiDate, sumLines } from "@/lib/money";
-import { listRequirements } from "@/lib/queries";
+import { invoiceParties, listInvoices } from "@/lib/queries";
 
 const invoiceLabel = { DRAFT: "Draft", ISSUED: "Issued", PAID: "Paid" } as const;
+const purposes = [
+  ["", "All"],
+  ["WEB", "Web development"],
+  ["PRODUCT", "Product purchase"],
+  ["TRADING", "Trading"],
+] as const;
+const purposeLabel: Record<string, string> = {
+  WEB: "Web development",
+  PRODUCT: "Product purchase",
+  TRADING: "Trading",
+};
 
-export default async function InvoicesPage() {
-  const jobs = (await listRequirements()).filter((job) => job.quotation?.contract?.invoice);
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ purpose?: string }>;
+}) {
+  const messages = await searchParams;
+  const selected = purposes.some(([value]) => value === messages.purpose) ? messages.purpose ?? "" : "";
+  const invoices = (await listInvoices()).filter((invoice) => !selected || invoice.purpose === selected);
 
   return (
     <>
-      <PageTitle kicker="Invoices" title="Invoices" text="An invoice opens after the contract is signed. It shows either the company QR or the bank slip." />
+      <PageTitle kicker="Invoices" title="Invoices" text="Create as many as you need. Each one is desk paperwork, with its own lines and your company bank details." />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {purposes.map(([value, label]) => {
+            const on = selected === value;
+            const href = value ? `/invoices?purpose=${value}` : "/invoices";
+            return (
+              <Link
+                key={label}
+                href={href}
+                className={`rounded-lg px-3 py-2 text-sm font-medium ${on ? "bg-brand-50 text-brand-500" : "text-gray-600 hover:bg-gray-100"}`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+        <Link href="/invoices/new" className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">
+          New invoice
+        </Link>
+      </div>
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pt-4 pb-3 sm:px-6">
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">All invoices</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-800">{selected ? purposeLabel[selected] : "All invoices"}</h2>
         <div className="max-w-full overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left">
+          <table className="w-full min-w-[860px] text-left">
             <thead className="border-y border-gray-100">
               <tr>
-                {["Invoice", "Client", "Project", "Total", "Stage", "Updated", "Action"].map((label) => (
+                {["Invoice", "Purpose", "Client", "What", "Total", "Stage", "Updated", "Action"].map((label) => (
                   <th key={label} className="py-3 text-start text-xs font-medium text-gray-500">
                     {label}
                   </th>
@@ -25,32 +62,31 @@ export default async function InvoicesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {jobs.length === 0 ? (
+              {invoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-sm text-gray-500">
-                    No invoices yet.
+                  <td colSpan={8} className="py-8 text-sm text-gray-500">
+                    No invoices in this list yet.
                   </td>
                 </tr>
               ) : (
-                jobs.map((job) => {
-                  const invoice = job.quotation!.contract!.invoice!;
-                  const stage = invoiceLabel[invoice.status];
+                invoices.map((invoice) => {
+                  const party = invoiceParties(invoice);
                   return (
                     <tr key={invoice.id}>
                       <td className="py-3">
                         <Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-gray-800 hover:text-brand-500">
                           {invoice.number}
                         </Link>
-                        {job.sample ? <p className="text-xs text-gray-500">Sample</p> : null}
                       </td>
+                      <td className="py-3 text-sm text-gray-700">{purposeLabel[invoice.purpose] ?? invoice.purpose}</td>
                       <td className="py-3 text-sm text-gray-500">
-                        <p>{job.clientName}</p>
-                        {job.clientCompany ? <p className="text-xs text-gray-400">{job.clientCompany}</p> : null}
+                        <p>{party.clientCompany || party.clientName || "—"}</p>
+                        {party.clientCompany && party.clientName ? <p className="text-xs text-gray-400">{party.clientName}</p> : null}
                       </td>
-                      <td className="py-3 text-sm text-gray-500">{job.title}</td>
+                      <td className="py-3 text-sm text-gray-500">{party.title}</td>
                       <td className="py-3 text-sm text-gray-800">{money(sumLines(invoice.lines), invoice.currency)}</td>
                       <td className="py-3">
-                        <StatusBadge label={stage} />
+                        <StatusBadge label={invoiceLabel[invoice.status]} />
                       </td>
                       <td className="py-3 text-sm text-gray-500">{shanghaiDate(invoice.updatedAt)}</td>
                       <td className="py-3 text-sm font-medium">

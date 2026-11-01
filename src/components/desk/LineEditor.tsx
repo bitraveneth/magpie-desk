@@ -12,12 +12,16 @@ export function LineEditor({
   currency,
   lines,
   locked,
+  extra,
+  submitLabel = "Save lines",
 }: {
   action: (formData: FormData) => void;
   quotationId: string;
   currency: string;
   lines: Row[];
   locked: boolean;
+  extra?: React.ReactNode;
+  submitLabel?: string;
 }) {
   const [rows, setRows] = useState<Row[]>(
     lines.length > 0 ? lines : [{ key: "new-0", description: "", quantity: "1", unitAmount: "0" }],
@@ -53,6 +57,7 @@ export function LineEditor({
   return (
     <form action={action} className="grid gap-4">
       <input type="hidden" name="id" value={quotationId} />
+      {extra}
       <label className="block max-w-40">
         <span className="mb-2 block text-sm font-semibold">Currency</span>
         <Input name="currency" defaultValue={currency} maxLength={3} />
@@ -93,7 +98,7 @@ export function LineEditor({
         >
           Add line
         </Button>
-        <Button type="submit">Save lines</Button>
+        <Button type="submit">{submitLabel}</Button>
       </div>
     </form>
   );

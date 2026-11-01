@@ -11,6 +11,7 @@ import {
   ensureDesk,
   getCompany,
   takeDocumentNumber,
+  takeInvoiceNumber,
   takeShareToken,
   takeShortNumber,
 } from "@/lib/queries";
@@ -411,23 +412,44 @@ export async function signContract(formData: FormData) {
   done(`/contracts/${id}`, "Contract signed.");
 }
 
+const invoicePurposes = new Set(["WEB", "PRODUCT", "TRADING"]);
+
+function invoiceLines(formData: FormData) {
+  const descriptions = formData.getAll("description").map((value) => String(value).trim());
+  const quantities = formData.getAll("quantity").map((value) => Number(value));
+  const amounts = formData.getAll("unitAmount").map((value) => Number(value));
+  return descriptions
+    .map((description, index) => ({
+      description,
+      quantity: quantities[index],
+      unitAmount: amounts[index],
+      sort: index,
+    }))
+    .filter((line) => line.description);
+}
+
 export async function createInvoice(formData: FormData) {
   const contractId = text(formData, "contractId");
   const contract = await prisma.contract.findUnique({
     where: { id: contractId },
     include: {
       invoice: true,
-      quotation: { include: { lines: { orderBy: { sort: "asc" } } } },
+      quotation: { include: { lines: { orderBy: { sort: "asc" } }, requirement: true } },
     },
   });
   if (!contract) fail("/requirements", "Contract not found.");
   if (contract.status !== "SIGNED") fail(`/contracts/${contract.id}`, "Sign the contract before an invoice.");
   if (contract.invoice) fail(`/invoices/${contract.invoice.id}`, "This contract already has an invoice.");
+  const client = contract.quotation.requirement;
 
   const invoice = await prisma.invoice.create({
     data: {
-      number: await takeShortNumber("INV"),
+      number: await takeInvoiceNumber(client.clientCompany || client.clientName),
       contractId: contract.id,
+      purpose: "WEB",
+      clientName: client.clientName,
+      clientCompany: client.clientCompany,
+      title: client.title,
       currency: contract.quotation.currency,
       lines: {
         create: contract.quotation.lines.map((line) => ({
@@ -440,6 +462,61 @@ export async function createInvoice(formData: FormData) {
     },
   });
   done(`/invoices/${invoice.id}`, "Invoice created.");
+}
+
+export async function createDeskInvoice(formData: FormData) {
+  const purpose = text(formData, "purpose");
+  const clientName = text(formData, "clientName");
+  const clientCompany = text(formData, "clientCompany");
+  const title = text(formData, "title");
+  if (!invoicePurposes.has(purpose)) fail("/invoices/new", "Choose what this invoice is for.");
+  if (!clientName && !clientCompany) fail("/invoices/new", "Add the other company or a client name.");
+
+  const invoice = await prisma.invoice.create({
+    data: {
+      number: await takeInvoiceNumber(clientCompany || clientName),
+      purpose,
+      clientName,
+      clientCompany,
+      title,
+      currency: currencyCode(text(formData, "currency") || "CNY"),
+      lines: {
+        create: [{ description: title || "Item", quantity: 1, unitAmount: 0, sort: 0 }],
+      },
+    },
+  });
+  done(`/invoices/${invoice.id}`, "Invoice created. Add the line items you need.");
+}
+
+export async function saveInvoice(formData: FormData) {
+  const id = text(formData, "id");
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice) fail("/invoices", "Invoice not found.");
+  if (invoice.status === "PAID") fail(`/invoices/${id}`, "A paid invoice stays locked.");
+  const purpose = text(formData, "purpose");
+  if (!invoicePurposes.has(purpose)) fail(`/invoices/${id}`, "Choose what this invoice is for.");
+  const lines = invoiceLines(formData);
+  if (lines.length === 0) fail(`/invoices/${id}`, "Add at least one line with a description.");
+  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
+    fail(`/invoices/${id}`, "Quantity must be greater than zero.");
+  }
+  if (lines.some((line) => !Number.isFinite(line.unitAmount) || line.unitAmount < 0)) {
+    fail(`/invoices/${id}`, "Amounts cannot be negative.");
+  }
+
+  await prisma.invoiceLine.deleteMany({ where: { invoiceId: id } });
+  await prisma.invoice.update({
+    where: { id },
+    data: {
+      purpose,
+      clientName: text(formData, "clientName"),
+      clientCompany: text(formData, "clientCompany"),
+      title: text(formData, "title"),
+      currency: currencyCode(text(formData, "currency")),
+      lines: { create: lines },
+    },
+  });
+  done(`/invoices/${id}`, "Invoice saved.");
 }
 
 export async function setPaymentMethod(formData: FormData) {
@@ -472,7 +549,6 @@ export async function markInvoicePaid(formData: FormData) {
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) fail("/requirements", "Invoice not found.");
   if (invoice.status !== "ISSUED") fail(`/invoices/${id}`, "Issue the invoice before marking it paid.");
-  if (!invoice.paymentMethod) fail(`/invoices/${id}`, "Choose the company QR or the bank slip first.");
   await prisma.invoice.update({
     where: { id },
     data: { status: "PAID", paidAt: new Date() },
