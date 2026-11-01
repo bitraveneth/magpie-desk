@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { discountedLine, invoiceTotals, sumLines } from "./money.ts";
+import { discountedLine, invoiceTotals, money, sumLines } from "./money.ts";
+
+assert.equal(money(1100, "CNY"), "¥1,100.00");
+assert.equal(money(80, "USD"), "USD 80.00");
 
 const priced = discountedLine(2, 1000, 10);
 assert.equal(priced.gross, 2000);

@@ -500,7 +500,6 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
     [
       sellerValue("Company") || input.party.nameZh,
       input.party.nameEn,
-      sellerValue("Tax number") ? `Tax number  ${sellerValue("Tax number")}` : "",
       ...addressLines,
       sellerValue("Phone") ? `Phone  ${sellerValue("Phone")}` : "",
       input.party.email,

@@ -1,10 +1,16 @@
+const currencySymbols: Record<string, string> = {
+  CNY: "¥",
+  RMB: "¥",
+};
+
 export function money(amount: number, currency: string): string {
   const code = currency.trim().toUpperCase() || "USD";
   const formatted = amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return `${code} ${formatted}`;
+  const symbol = currencySymbols[code];
+  return symbol ? `${symbol}${formatted}` : `${code} ${formatted}`;
 }
 
 export function lineAmount(quantity: number, unitAmount: number): number {

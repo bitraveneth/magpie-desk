@@ -91,10 +91,6 @@ export function InvoiceEditor({
           <p className="legal-zh mt-3 text-lg font-semibold text-[#0f0f0f]">{seller.companyName}</p>
           <p className="mt-1 text-sm font-medium text-[#4a2476]">{nameEn}</p>
           <dl className="mt-4 space-y-1.5 text-sm text-[#3d3935]">
-            <div>
-              <span className="text-[#6b6560]">Tax number </span>
-              {seller.taxNumber}
-            </div>
             <div className="legal-zh">{seller.address}</div>
             <div>
               <span className="text-[#6b6560]">Phone </span>

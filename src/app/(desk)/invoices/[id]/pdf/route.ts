@@ -57,7 +57,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       { label: "Account name", value: payments.accountName },
       { label: "Account number", value: payments.accountNumber },
     ],
-    note: invoice.status === "PAID" ? "Paid." : invoice.status === "ISSUED" ? "Issued." : "Draft.",
+    note: "",
     image,
     footer: documentFooter(payments),
   });
