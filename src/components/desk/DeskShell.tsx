@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { logout } from "@/lib/auth-actions";
 
 const links = [
   { href: "/requirements", label: "Requirements" },
@@ -25,7 +27,7 @@ export function DeskShell({
           {publicMode ? (
             <p className="text-sm font-medium text-muted">Magpie Desk</p>
           ) : (
-            <nav className="flex flex-wrap gap-2">
+            <nav className="flex flex-wrap items-center gap-2">
               {links.map((link) => (
                 <Link
                   key={link.href}
@@ -35,6 +37,11 @@ export function DeskShell({
                   {link.label}
                 </Link>
               ))}
+              <form action={logout}>
+                <Button type="submit" variant="ghost" className="px-4 py-2">
+                  Log out
+                </Button>
+              </form>
             </nav>
           )}
         </div>

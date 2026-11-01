@@ -14,7 +14,7 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000. The admin desk asks for the username and password in `.env` (`ADMIN_USERNAME` and `ADMIN_PASSWORD`). Requirement links (`/r/...`) and partner links (`/p/...`) stay open without that login.
 
 `DATABASE_URL` is the pooled connection. `DIRECT_URL` is the direct connection used for migrations.
 
