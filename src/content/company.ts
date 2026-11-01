@@ -17,6 +17,11 @@ export const paymentDefaults = {
   accountNumber: "15411799840062",
 } as const;
 
+export const defaultBranch = {
+  bankName: "平安银行",
+  branchName: "深圳新城支行",
+} as const;
+
 export const quoteTemplates = [
   { id: "starter", name: "Starter", detail: "Up to 3 pages", amount: 1000, cadence: "project" },
   { id: "business", name: "Business", detail: "Up to 8 pages", amount: 3000, cadence: "project" },

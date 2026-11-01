@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { company, paymentDefaults } from "@/content/company";
+import { company, defaultBranch, paymentDefaults } from "@/content/company";
 import { questionBank } from "@/content/questions";
 import { ensurePipelineSamples } from "@/lib/sample-pipeline";
 import { prisma } from "@/lib/db";
@@ -292,10 +292,19 @@ export async function listBankAccounts() {
   return remember("banks", async () => {
     const payments = await ensurePaymentDefaults();
     const existing = await prisma.bankAccount.findMany({ orderBy: { createdAt: "asc" } });
-    if (existing.length > 0) return existing;
+    if (existing.length > 0) {
+      const combined = existing.find((account) => account.bankName === "平安银行深圳新城支行" && !account.branchName);
+      if (!combined) return existing;
+      const fixed = await prisma.bankAccount.update({
+        where: { id: combined.id },
+        data: { bankName: defaultBranch.bankName, branchName: defaultBranch.branchName },
+      });
+      return existing.map((account) => (account.id === fixed.id ? fixed : account));
+    }
     const created = await prisma.bankAccount.create({
       data: {
-        bankName: payments.bankName || paymentDefaults.bankName,
+        bankName: defaultBranch.bankName,
+        branchName: defaultBranch.branchName,
         accountName: payments.accountName || paymentDefaults.accountName,
         accountNumber: payments.accountNumber || paymentDefaults.accountNumber,
         isDefault: true,

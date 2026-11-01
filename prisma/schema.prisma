@@ -85,6 +85,7 @@ model PaymentSettings {
 model BankAccount {
   id            String   @id @default(cuid())
   bankName      String
+  branchName    String   @default("")
   accountName   String
   accountNumber String
   isDefault     Boolean  @default(false)

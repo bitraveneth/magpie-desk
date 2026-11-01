@@ -609,11 +609,15 @@ export async function savePayments(formData: FormData) {
   done("/settings/payments", "Company details saved.");
 }
 
-async function copyBankToSettings(account: { bankName: string; accountName: string; accountNumber: string }) {
+function bankLine(account: { bankName: string; branchName: string }) {
+  return [account.bankName, account.branchName].filter(Boolean).join("");
+}
+
+async function copyBankToSettings(account: { bankName: string; branchName: string; accountName: string; accountNumber: string }) {
   await prisma.paymentSettings.update({
     where: { id: "payments" },
     data: {
-      bankName: account.bankName,
+      bankName: bankLine(account),
       accountName: account.accountName,
       accountNumber: account.accountNumber,
     },
@@ -623,14 +627,17 @@ async function copyBankToSettings(account: { bankName: string; accountName: stri
 export async function addBankAccount(formData: FormData) {
   await ensureDesk();
   const bankName = text(formData, "bankName");
+  const branchName = text(formData, "branchName");
   const accountName = text(formData, "accountName");
   const accountNumber = text(formData, "accountNumber");
-  if (!bankName || !accountNumber) fail("/settings/payments", "Add the bank name and the account number.");
+  if (!bankName || !branchName || !accountNumber) fail("/settings/payments", "Add the bank, the branch, and the account number.");
+  const payments = await prisma.paymentSettings.findUnique({ where: { id: "payments" } });
   const existing = await prisma.bankAccount.count();
   const account = await prisma.bankAccount.create({
     data: {
       bankName,
-      accountName: accountName || bankName,
+      branchName,
+      accountName: accountName || payments?.companyName || bankName,
       accountNumber,
       isDefault: existing === 0,
     },
