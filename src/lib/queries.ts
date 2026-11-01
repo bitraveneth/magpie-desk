@@ -287,6 +287,24 @@ export async function getPayments() {
   return remember("payments", () => ensurePaymentDefaults());
 }
 
+export async function listBankAccounts() {
+  await ensureDesk();
+  return remember("banks", async () => {
+    const payments = await ensurePaymentDefaults();
+    const existing = await prisma.bankAccount.findMany({ orderBy: { createdAt: "asc" } });
+    if (existing.length > 0) return existing;
+    const created = await prisma.bankAccount.create({
+      data: {
+        bankName: payments.bankName || paymentDefaults.bankName,
+        accountName: payments.accountName || paymentDefaults.accountName,
+        accountNumber: payments.accountNumber || paymentDefaults.accountNumber,
+        isDefault: true,
+      },
+    });
+    return [created];
+  });
+}
+
 export function paymentDetailLines(payments: {
   companyName: string;
   taxNumber: string;

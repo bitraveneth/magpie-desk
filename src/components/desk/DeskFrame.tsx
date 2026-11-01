@@ -174,10 +174,6 @@ export function DeskFrame({ children, notices = [] }: { children: React.ReactNod
         </div>
         <div className={`no-scrollbar flex flex-1 flex-col overflow-y-auto duration-300 ease-linear ${collapsed ? "px-5 lg:px-3" : "px-5"}`}>
           <nav className="mb-6">
-            <h2 className={`mb-4 text-xs leading-5 text-gray-400 uppercase ${collapsed ? "lg:text-center" : ""}`}>
-              <span className={collapsed ? "lg:hidden" : ""}>Menu</span>
-              {collapsed ? <span className="hidden lg:inline">•••</span> : null}
-            </h2>
             <ul className="flex flex-col gap-2">
               {links.map((link) => {
                 const on = active(link.href, pathname);

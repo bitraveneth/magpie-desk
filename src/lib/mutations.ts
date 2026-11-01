@@ -595,21 +595,8 @@ export async function markInvoicePaid(formData: FormData) {
   done(`/invoices/${id}`, "Invoice marked paid.");
 }
 
-const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
-
-async function imageBytes(formData: FormData, key: string, path: string) {
-  const value = formData.get(key);
-  if (!(value instanceof File) || value.size === 0) return null;
-  if (value.size > 2_000_000) fail(path, "Images must be 2 MB or smaller.");
-  if (!IMAGE_TYPES.has(value.type)) fail(path, "Use a PNG, JPEG, or WebP image.");
-  return { bytes: Buffer.from(await value.arrayBuffer()), mime: value.type };
-}
-
 export async function savePayments(formData: FormData) {
   await ensureDesk();
-  const path = "/settings/payments";
-  const qr = await imageBytes(formData, "qr", path);
-  const slip = await imageBytes(formData, "slip", path);
   await prisma.paymentSettings.update({
     where: { id: "payments" },
     data: {
@@ -617,16 +604,50 @@ export async function savePayments(formData: FormData) {
       taxNumber: text(formData, "taxNumber"),
       address: text(formData, "address"),
       phone: text(formData, "phone"),
-      bankName: text(formData, "bankName"),
-      accountName: text(formData, "accountName"),
-      accountNumber: text(formData, "accountNumber"),
-      ...(text(formData, "removeQr") === "yes" ? { qrImage: null, qrMime: null } : {}),
-      ...(text(formData, "removeSlip") === "yes" ? { slipImage: null, slipMime: null } : {}),
-      ...(qr ? { qrImage: qr.bytes, qrMime: qr.mime } : {}),
-      ...(slip ? { slipImage: slip.bytes, slipMime: slip.mime } : {}),
     },
   });
-  done(path, "Payment settings saved.");
+  done("/settings/payments", "Company details saved.");
+}
+
+async function copyBankToSettings(account: { bankName: string; accountName: string; accountNumber: string }) {
+  await prisma.paymentSettings.update({
+    where: { id: "payments" },
+    data: {
+      bankName: account.bankName,
+      accountName: account.accountName,
+      accountNumber: account.accountNumber,
+    },
+  });
+}
+
+export async function addBankAccount(formData: FormData) {
+  await ensureDesk();
+  const bankName = text(formData, "bankName");
+  const accountName = text(formData, "accountName");
+  const accountNumber = text(formData, "accountNumber");
+  if (!bankName || !accountNumber) fail("/settings/payments", "Add the bank name and the account number.");
+  const existing = await prisma.bankAccount.count();
+  const account = await prisma.bankAccount.create({
+    data: {
+      bankName,
+      accountName: accountName || bankName,
+      accountNumber,
+      isDefault: existing === 0,
+    },
+  });
+  if (account.isDefault) await copyBankToSettings(account);
+  done("/settings/payments", "Bank account added.");
+}
+
+export async function useBankAccount(formData: FormData) {
+  await ensureDesk();
+  const id = text(formData, "id");
+  const account = await prisma.bankAccount.findUnique({ where: { id } });
+  if (!account) fail("/settings/payments", "Bank account not found.");
+  await prisma.bankAccount.updateMany({ data: { isDefault: false } });
+  await prisma.bankAccount.update({ where: { id }, data: { isDefault: true } });
+  await copyBankToSettings(account);
+  done("/settings/payments", "Invoices will use this bank account.");
 }
 
 export async function createPartner(formData: FormData) {
