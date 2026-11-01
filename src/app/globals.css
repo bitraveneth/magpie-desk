@@ -1,0 +1,185 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f2ea;
+  --foreground: #0f0f0f;
+  --accent: #5c2d91;
+  --accent-strong: #4a2476;
+  --muted: #6b6560;
+  --card: #ffffff;
+  --border: #e5dfd4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --font-sans: var(--font-urbanist);
+
+  --color-brand-25: #f2f7ff;
+  --color-brand-50: #ecf3ff;
+  --color-brand-100: #dde9ff;
+  --color-brand-200: #c2d6ff;
+  --color-brand-300: #9cb9ff;
+  --color-brand-400: #7592ff;
+  --color-brand-500: #465fff;
+  --color-brand-600: #3641f5;
+  --color-brand-700: #2a31d8;
+  --color-brand-800: #252dae;
+  --color-brand-900: #262e89;
+  --color-brand-950: #161950;
+
+  --text-title-sm: 18px;
+  --text-title-sm--line-height: 28px;
+
+  --shadow-theme-xs: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+  --shadow-theme-sm: 0px 1px 3px 0px rgba(16, 24, 40, 0.1), 0px 1px 2px 0px rgba(16, 24, 40, 0.06);
+  --shadow-theme-md: 0px 4px 8px -2px rgba(16, 24, 40, 0.1), 0px 2px 4px -2px rgba(16, 24, 40, 0.06);
+  --shadow-theme-lg: 0px 12px 16px -4px rgba(16, 24, 40, 0.08), 0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-urbanist), system-ui, sans-serif;
+}
+
+.desk-card {
+  border-radius: 1.5rem;
+  border: 1px solid color-mix(in srgb, #ffffff 58%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #ffffff 92%, var(--background)),
+    color-mix(in srgb, var(--background) 55%, #ffffff)
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 80%, transparent),
+    0 12px 30px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.display {
+  font-family: var(--font-hero-title), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.legal-zh {
+  font-family: var(--font-noto-sc), "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+}
+
+@keyframes question-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.question-rise {
+  animation: question-rise 240ms ease;
+}
+
+.brief-stage {
+  background:
+    radial-gradient(720px 340px at 50% -8%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 68%),
+    var(--background);
+}
+
+.brief-frame {
+  width: min(100% - 2rem, 32rem);
+  margin-inline: auto;
+  margin-block: auto;
+  padding-block: 1.75rem 2rem;
+}
+
+.brief-sheet {
+  border-radius: 1.75rem;
+  border: 1px solid color-mix(in srgb, #ffffff 40%, var(--border));
+  background: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 22px 50px color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .brief-sheet {
+    padding: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .brief-frame:has(.brief-board) {
+    width: min(100% - 3rem, 56rem);
+  }
+}
+
+/* TailAdmin v2.5 dashboard chrome. Scoped so the public brief keeps the Magpie look. */
+@utility menu-item {
+  @apply relative flex w-full items-center gap-4 rounded-xl px-4 py-3 text-base font-medium;
+}
+
+@utility menu-item-active {
+  @apply bg-brand-50 text-brand-500;
+}
+
+@utility menu-item-inactive {
+  @apply text-gray-700 hover:bg-gray-100;
+}
+
+@utility menu-item-icon-active {
+  @apply text-brand-500;
+}
+
+@utility menu-item-icon-inactive {
+  @apply text-gray-500 group-hover:text-gray-700;
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.desk-admin {
+  --background: #f9fafb;
+  --foreground: #1d2939;
+  --accent: #465fff;
+  --accent-strong: #3641f5;
+  --muted: #667085;
+  --card: #ffffff;
+  --border: #e4e7ec;
+  background: #f9fafb;
+  color: #1d2939;
+  font-family: var(--font-outfit), var(--font-noto-sc), ui-sans-serif, system-ui, sans-serif;
+}
+
+.desk-admin .desk-card {
+  border-radius: 1rem;
+  border: 1px solid #e4e7ec;
+  background: #ffffff;
+  box-shadow: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+}
+
+.desk-admin .display {
+  font-family: inherit;
+  letter-spacing: -0.02em;
+}
+
+.desk-admin :is(a, button).rounded-full {
+  border-radius: 0.5rem;
+  box-shadow: none;
+}
+
+.desk-admin :is(input, textarea, select).rounded-2xl {
+  border-radius: 0.5rem;
+  box-shadow: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+}

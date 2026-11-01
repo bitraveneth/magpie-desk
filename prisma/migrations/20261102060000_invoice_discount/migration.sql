@@ -1,0 +1,1 @@
+ALTER TABLE "InvoiceLine" ADD COLUMN "discountRate" DECIMAL(5,2) NOT NULL DEFAULT 0;

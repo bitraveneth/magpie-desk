@@ -1,0 +1,269 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RequirementStatus {
+  DRAFT
+  READY
+}
+
+enum QuotationStatus {
+  DRAFT
+  ACCEPTED
+  DECLINED
+}
+
+enum ContractStatus {
+  DRAFT
+  SIGNED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+}
+
+enum PaymentMethod {
+  COMPANY_QR
+  BANK_SLIP
+}
+
+enum NdaStatus {
+  OFFERED
+  SIGNED
+}
+
+enum BriefStatus {
+  SENT
+  FILLED
+  SIGNED
+}
+
+enum AnswerKind {
+  SHORT
+  LONG
+  DROPDOWN
+  MULTI
+  URL
+  URLS
+  DATE
+  FILE
+}
+
+model CompanyProfile {
+  id         String  @id
+  publicName String
+  nameEn     String
+  nameZh     String
+  email      String
+  address    String
+  seeded     Boolean @default(false)
+}
+
+model PaymentSettings {
+  id            String  @id
+  companyName   String  @default("")
+  taxNumber     String  @default("")
+  address       String  @default("")
+  phone         String  @default("")
+  bankName      String  @default("")
+  accountName   String  @default("")
+  accountNumber String  @default("")
+  qrImage       Bytes?
+  qrMime        String?
+  slipImage     Bytes?
+  slipMime      String?
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  bankName      String
+  branchName    String   @default("")
+  accountName   String
+  accountNumber String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model Partner {
+  id             String        @id @default(cuid())
+  name           String
+  code           String        @unique
+  commissionRate Decimal?      @db.Decimal(6, 2)
+  sample         Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  requirements   Requirement[]
+}
+
+model Requirement {
+  id            String            @id @default(cuid())
+  number        String            @unique
+  shareToken    String            @unique
+  clientName    String
+  clientEmail   String            @default("")
+  clientCompany String            @default("")
+  title         String
+  summary       String            @default("")
+  status        RequirementStatus @default(DRAFT)
+  sample        Boolean           @default(false)
+  partnerId     String?
+  partner       Partner?          @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  signedInName  String?
+  signedInEmail String?
+  signedInAt    DateTime?
+  briefStatus    BriefStatus       @default(SENT)
+  correctionNote String            @default("")
+  confirmedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  quotation      Quotation?
+  nda            Nda?
+  answers        RequirementAnswer[]
+  files          RequirementFile[]
+  notices        DeskNotice[]
+}
+
+model DeskNotice {
+  id            String      @id @default(cuid())
+  requirementId String
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  kind          String
+  message       String
+  createdAt     DateTime    @default(now())
+  readAt        DateTime?
+
+  @@index([readAt])
+}
+
+model RequirementQuestion {
+  id           String     @id
+  section      String
+  sectionLabel String
+  sectionSort  Int
+  sort         Int
+  label        String
+  help         String     @default("")
+  kind         AnswerKind
+  options      String[]
+  types        String[]
+  required     Boolean    @default(false)
+  locked       Boolean    @default(false)
+  hidden       Boolean    @default(false)
+  dependsOn    String     @default("")
+  dependsValue String     @default("")
+  answers      RequirementAnswer[]
+  files        RequirementFile[]
+}
+
+model RequirementAnswer {
+  id            String              @id @default(cuid())
+  requirementId String
+  questionId    String
+  value         String              @db.Text
+  requirement   Requirement         @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  question      RequirementQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([requirementId, questionId])
+}
+
+model RequirementFile {
+  id            String              @id @default(cuid())
+  requirementId String
+  questionId    String
+  fileName      String
+  mime          String
+  bytes         Bytes
+  createdAt     DateTime            @default(now())
+  requirement   Requirement         @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  question      RequirementQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
+}
+
+model Quotation {
+  id            String          @id @default(cuid())
+  number        String          @unique
+  requirementId String          @unique
+  requirement   Requirement     @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  currency      String          @default("USD")
+  status        QuotationStatus @default(DRAFT)
+  lines         QuotationLine[]
+  contract      Contract?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model QuotationLine {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal   @db.Decimal(12, 2)
+  unitAmount  Decimal   @db.Decimal(12, 2)
+  sort        Int
+}
+
+model Contract {
+  id          String         @id @default(cuid())
+  number      String         @unique
+  quotationId String         @unique
+  quotation   Quotation      @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  body        String         @db.Text
+  status      ContractStatus @default(DRAFT)
+  signedAt    DateTime?
+  invoice     Invoice?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Invoice {
+  id            String         @id @default(cuid())
+  number        String         @unique
+  contractId    String?        @unique
+  contract      Contract?      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  purpose       String         @default("WEB")
+  clientName    String         @default("")
+  clientCompany String         @default("")
+  title         String         @default("")
+  currency      String
+  status        InvoiceStatus  @default(DRAFT)
+  paymentMethod PaymentMethod?
+  issuedAt      DateTime?
+  paidAt        DateTime?
+  lines         InvoiceLine[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model InvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description  String
+  quantity     Decimal @db.Decimal(12, 2)
+  unitAmount   Decimal @db.Decimal(12, 2)
+  discountRate Decimal @default(0) @db.Decimal(5, 2)
+  sort         Int
+}
+
+model Nda {
+  id            String      @id @default(cuid())
+  number        String      @unique
+  requirementId String      @unique
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  body          String      @db.Text
+  status        NdaStatus   @default(OFFERED)
+  signerName    String?
+  signerEmail   String?
+  signedAt      DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
