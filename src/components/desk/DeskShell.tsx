@@ -128,9 +128,9 @@ export function StatusBadge({ label }: { label: string }) {
   const tone =
     label === "Filled"
       ? "border-transparent bg-orange-50 text-orange-600"
-      : label === "Signed"
+      : label === "Signed" || label === "Issued"
         ? "border-transparent bg-brand-50 text-brand-500"
-        : label === "Confirmed"
+        : label === "Confirmed" || label === "Paid"
           ? "border-transparent bg-green-50 text-green-600"
           : "border-transparent bg-gray-100 text-gray-600";
   return <Badge className={tone}>{label}</Badge>;

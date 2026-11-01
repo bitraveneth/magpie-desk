@@ -271,7 +271,7 @@ export async function listRequirements() {
     include: {
       partner: true,
       nda: true,
-      quotation: { include: { contract: { include: { invoice: true } } } },
+      quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
     },
   });
 }
