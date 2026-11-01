@@ -1,20 +1,18 @@
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
-import { Banner, Field, PageTitle, SampleNote, StatusBadge } from "@/components/desk/DeskShell";
+import { Banner, PageTitle, SampleNote, StatusBadge } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
 import { CopyLink } from "@/components/desk/CopyLink";
 import { quoteTemplates } from "@/content/company";
+import { company } from "@/content/company";
 import { deskStatus } from "@/lib/brief";
 import { createQuotation, offerNda, confirmRequirement, returnForCorrection, updateRequirement } from "@/lib/mutations";
 import { markRequirementNoticesRead } from "@/lib/notices";
 import { answeredSections } from "@/lib/requirement-document";
 import { getJob, listQuestions, origin } from "@/lib/queries";
-import { shanghaiDate } from "@/lib/money";
-import { company } from "@/content/company";
+import { money, shanghaiDate } from "@/lib/money";
+
+const fieldClass = "h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-brand-500";
 
 export default async function RequirementDetailPage({
   params,
@@ -33,10 +31,23 @@ export default async function RequirementDetailPage({
   const link = `${await origin()}/r/${job.shareToken}`;
   const filled = job.briefStatus !== "SENT";
   const signedCopy = job.files.find((file) => file.questionId === "__signed_copy");
+  const client = [job.clientCompany, job.clientName].filter(Boolean).join(" · ");
 
   return (
     <>
-      <PageTitle kicker={job.number} title={job.title} text="Send this requirement link when the brief is for the client. Use a partner link only when the lead comes from a partner." />
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <PageTitle kicker={job.number} title={job.title} />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge label={deskStatus(job)} />
+          <SampleNote sample={job.sample} />
+          <Button href={`/requirements/${job.id}/pdf`} variant="outline" className="px-4 py-2">
+            Download PDF
+          </Button>
+          <Button href={link} variant="outline" className="px-4 py-2">
+            Open link
+          </Button>
+        </div>
+      </div>
       <Banner error={messages.error} notice={messages.notice} />
       <Chain
         current="requirement"
@@ -45,170 +56,192 @@ export default async function RequirementDetailPage({
         contractId={job.quotation?.contract?.id}
         invoiceId={job.quotation?.contract?.invoice?.id}
       />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <StatusBadge label={deskStatus(job)} />
-        <SampleNote sample={job.sample} />
-        {job.partner ? <Badge>Partner: {job.partner.name}</Badge> : <Badge>No partner</Badge>}
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-        <Card>
-          <form action={updateRequirement} className="grid gap-4">
+
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          <h2 className="text-lg font-semibold text-gray-800">Client</h2>
+          <form action={updateRequirement} className="mt-4 grid gap-3">
             <input type="hidden" name="id" value={job.id} />
-            <Field label="Client name">
-              <Input name="clientName" defaultValue={job.clientName} required />
-            </Field>
-            <Field label="Client email">
-              <Input name="clientEmail" type="email" defaultValue={job.clientEmail} />
-            </Field>
-            <Field label="Client company">
-              <Input name="clientCompany" defaultValue={job.clientCompany} />
-            </Field>
-            <Field label="Project title">
-              <Input name="title" defaultValue={job.title} required />
-            </Field>
-            <Field label="Summary">
-              <Textarea name="summary" rows={5} defaultValue={job.summary} />
-            </Field>
-            <Button type="submit">Save brief</Button>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-gray-500">Name</span>
+              <input name="clientName" defaultValue={job.clientName} required className={fieldClass} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-gray-500">Email</span>
+              <input name="clientEmail" type="email" defaultValue={job.clientEmail} className={fieldClass} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-gray-500">Company</span>
+              <input name="clientCompany" defaultValue={job.clientCompany} className={fieldClass} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-gray-500">Project</span>
+              <input name="title" defaultValue={job.title} required className={fieldClass} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-gray-500">Summary</span>
+              <textarea name="summary" rows={4} defaultValue={job.summary} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 outline-none focus:border-brand-500" />
+            </label>
+            <div className="flex justify-end">
+              <Button type="submit">Save</Button>
+            </div>
           </form>
-        </Card>
-        <div className="grid gap-6">
-          <Card>
-            <h2 className="text-lg font-semibold">Requirement link</h2>
-            <p className="mt-2 text-sm text-muted">Send this link to the client. They fill the questionnaire, download the PDF, and can sign it.</p>
-            <div className="mt-4">
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="border-b border-gray-100 px-5 py-4">
+            <h2 className="text-lg font-semibold text-gray-800">Send to the client</h2>
+            <p className="mt-1 text-sm text-gray-500">They answer, download the PDF, and can sign on this link.</p>
+            <div className="mt-3">
               <CopyLink url={link} label="Requirement link" />
             </div>
-          </Card>
-          <Card>
-            <h2 className="text-lg font-semibold">Requirement PDF</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Both parties are named on the PDF: {company.publicName} ({company.nameEn}) and {job.clientCompany || job.clientName}
-              {job.clientCompany && job.clientName ? ` · ${job.clientName}` : ""}.
-            </p>
-            <p className="mt-2 text-sm text-muted">
-              {job.briefStatus === "SIGNED" && job.signedInAt
-                ? `Signed by ${job.signedInName} on ${shanghaiDate(job.signedInAt)}.`
-                : filled
-                  ? "The client has submitted the questionnaire."
-                  : "The PDF fills in as the client answers. It picks up the signature after they sign."}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button href={`/requirements/${job.id}/pdf`} variant="outline">Download PDF</Button>
-              {signedCopy ? <Button href={`/requirements/${job.id}/signed`} variant="ghost">Signed upload</Button> : null}
-            </div>
-          </Card>
-          {job.quotation ? null : job.briefStatus === "FILLED" || job.briefStatus === "SIGNED" ? (
-            <Card>
-              <h2 className="text-lg font-semibold">Send back for correction</h2>
-              <p className="mt-2 text-sm text-muted">The same link opens again. The client can change the answers, then sign and upload the PDF once more.</p>
-              <form action={returnForCorrection} className="mt-4 grid gap-3">
-                <input type="hidden" name="id" value={job.id} />
-                <Field label="Note for the client">
-                  <Textarea name="note" rows={3} defaultValue={job.correctionNote} placeholder="What should they correct?" />
-                </Field>
-                <Button type="submit" variant="outline">Resend for correction</Button>
-              </form>
-            </Card>
-          ) : null}
-          {job.briefStatus === "SIGNED" && !job.confirmedAt ? (
-            <Card>
-              <h2 className="text-lg font-semibold">Confirm</h2>
-              <p className="mt-2 text-sm text-muted">
-                {signedCopy ? `${signedCopy.fileName} is uploaded.` : "The client has signed. They can also upload the signed PDF from the link."} Confirm it before the quotation.
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div>
+              <h3 className="font-semibold text-gray-800">PDF</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {company.publicName} and {client || "the client"}
               </p>
-              <form action={confirmRequirement} className="mt-4">
-                <input type="hidden" name="id" value={job.id} />
-                <Button type="submit">Confirm requirement</Button>
-              </form>
-            </Card>
+              <p className="mt-1 text-sm text-gray-500">
+                {job.briefStatus === "SIGNED" && job.signedInAt
+                  ? `Signed by ${job.signedInName} · ${shanghaiDate(job.signedInAt)}`
+                  : filled
+                    ? "Questionnaire submitted"
+                    : "Waiting for the client"}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {signedCopy ? (
+                <Button href={`/requirements/${job.id}/signed`} variant="outline" className="px-4 py-2">
+                  Signed file
+                </Button>
+              ) : null}
+              <Button href={`/requirements/${job.id}/pdf`} variant="outline" className="px-4 py-2">
+                Download
+              </Button>
+            </div>
+          </div>
+
+          {job.quotation ? null : filled ? (
+            <form action={returnForCorrection} className="grid gap-3 border-b border-gray-100 px-5 py-4">
+              <input type="hidden" name="id" value={job.id} />
+              <div>
+                <h3 className="font-semibold text-gray-800">Send back</h3>
+                <p className="mt-1 text-sm text-gray-500">The same link opens again for a correction.</p>
+              </div>
+              <textarea
+                name="note"
+                rows={2}
+                defaultValue={job.correctionNote}
+                placeholder="What should they correct?"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 outline-none focus:border-brand-500"
+              />
+              <div className="flex justify-end">
+                <Button type="submit" variant="outline" className="px-4 py-2">
+                  Resend
+                </Button>
+              </div>
+            </form>
           ) : null}
-          <Card>
-            <h2 className="text-lg font-semibold">Sign-in and NDA</h2>
-            <p className="mt-2 text-sm text-muted">
-              {job.signedInAt
-                ? `${job.signedInName} signed in at ${shanghaiDate(job.signedInAt)}.`
-                : "The client has not signed the requirement yet."}
-            </p>
-            <p className="mt-2 text-sm text-muted">
-              {job.nda?.status === "SIGNED"
-                ? `NDA ${job.nda.number} signed by ${job.nda.signerName}.`
-                : job.nda
-                  ? `NDA ${job.nda.number} is offered. The client can sign it when they sign in.`
-                  : "No NDA yet. Offer one if the client should be able to sign it with the requirement."}
-            </p>
-            {job.nda ? (
-              <pre className="mt-4 whitespace-pre-wrap text-sm leading-6 text-foreground">{job.nda.body}</pre>
-            ) : (
-              <form action={offerNda} className="mt-4">
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div>
+              <h3 className="font-semibold text-gray-800">Sign and NDA</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {job.signedInAt ? `${job.signedInName} signed · ${shanghaiDate(job.signedInAt)}` : "Not signed yet"}
+                {" · "}
+                {job.nda?.status === "SIGNED"
+                  ? `NDA signed by ${job.nda.signerName}`
+                  : job.nda
+                    ? `NDA ${job.nda.number} offered`
+                    : "No NDA"}
+              </p>
+            </div>
+            {job.briefStatus === "SIGNED" && !job.confirmedAt ? (
+              <form action={confirmRequirement}>
                 <input type="hidden" name="id" value={job.id} />
-                <Button type="submit" variant="outline">
+                <Button type="submit" className="px-4 py-2">
+                  Confirm
+                </Button>
+              </form>
+            ) : job.nda ? null : (
+              <form action={offerNda}>
+                <input type="hidden" name="id" value={job.id} />
+                <Button type="submit" variant="outline" className="px-4 py-2">
                   Offer NDA
                 </Button>
               </form>
             )}
-          </Card>
-        </div>
-      </div>
-      <Card className="mt-6">
-        <h2 className="text-lg font-semibold">Quotation</h2>
-        {job.quotation ? (
-          <div className="mt-4">
-            <Button href={`/quotations/${job.quotation.id}`}>Open {job.quotation.number}</Button>
           </div>
-        ) : job.confirmedAt ? (
-          <div className="mt-4 flex flex-wrap gap-3">
-            <form action={createQuotation}>
-              <input type="hidden" name="requirementId" value={job.id} />
-              <Button type="submit" variant="outline">
-                Blank quotation
+
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+            <div>
+              <h3 className="font-semibold text-gray-800">Quotation</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {job.quotation
+                  ? job.quotation.number
+                  : job.confirmedAt
+                    ? "Ready to price"
+                    : filled
+                      ? "Opens after the client signs and you confirm"
+                      : "Opens after the client fills, signs, and you confirm"}
+              </p>
+            </div>
+            {job.quotation ? (
+              <Button href={`/quotations/${job.quotation.id}`} className="px-4 py-2">
+                Open
               </Button>
-            </form>
-            {quoteTemplates.map((template) => (
-              <form key={template.id} action={createQuotation}>
+            ) : job.confirmedAt ? (
+              <form action={createQuotation}>
                 <input type="hidden" name="requirementId" value={job.id} />
-                <input type="hidden" name="templateId" value={template.id} />
-                <Button type="submit" variant="ghost">
-                  {template.name} · USD {template.amount.toLocaleString("en-US")} / {template.cadence}
+                <Button type="submit" className="px-4 py-2">
+                  New quotation
                 </Button>
               </form>
-            ))}
+            ) : null}
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted">
-            {filled
-              ? "The client still needs to sign. After you confirm the signed brief, the quotation opens."
-              : "The client fills the questionnaire on the requirement link. A quotation opens after they sign and you confirm it."}
-          </p>
-        )}
-      </Card>
-      <Card className="mt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Questionnaire</h2>
-          <Button href="/requirements/questions" variant="ghost">
+          {job.confirmedAt && !job.quotation ? (
+            <div className="flex flex-wrap gap-2 border-t border-gray-100 px-5 py-4">
+              {quoteTemplates.map((template) => (
+                <form key={template.id} action={createQuotation}>
+                  <input type="hidden" name="requirementId" value={job.id} />
+                  <input type="hidden" name="templateId" value={template.id} />
+                  <Button type="submit" variant="outline" className="px-3 py-2">
+                    {template.name} · {money(template.amount, "USD")}
+                  </Button>
+                </form>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      </div>
+
+      <section className="mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        <header className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <h2 className="text-lg font-semibold text-gray-800">Answers</h2>
+          <Button href="/requirements/questions" variant="outline" className="px-4 py-2">
             Edit questions
           </Button>
-        </div>
+        </header>
         {review.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">No answers yet.</p>
+          <p className="px-5 py-6 text-sm text-gray-500">No answers yet.</p>
         ) : (
-          <div className="mt-6 grid gap-5">
-            {review.map((section) => (
-              <section key={section.id}>
-                <h3 className="font-semibold text-accent">{section.label}</h3>
-                <div className="mt-3 grid gap-3">
-                  {section.rows.map((row) => (
-                    <div key={row.label}>
-                      <p className="text-sm font-semibold">{row.label}</p>
-                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted">{row.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+          review.map((section) => (
+            <div key={section.id} className="border-b border-gray-100 px-5 py-4 last:border-b-0">
+              <h3 className="text-xs font-semibold tracking-[0.14em] text-gray-400 uppercase">{section.label}</h3>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                {section.rows.map((row) => (
+                  <div key={row.label}>
+                    <dt className="text-xs text-gray-500">{row.label}</dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-800">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))
         )}
-      </Card>
+      </section>
     </>
   );
 }
