@@ -17,6 +17,7 @@ import {
   signBrief,
   submitBrief,
   uploadBriefFile,
+  uploadSignedCopy,
 } from "@/lib/brief-actions";
 
 type BriefFile = { id: string; questionId: string; fileName: string };
@@ -43,6 +44,8 @@ export function Typeform({
   signedLabel,
   ndaText,
   ndaSigned,
+  correctionNote = "",
+  signedCopyName = "",
 }: {
   token: string;
   title: string;
@@ -56,6 +59,8 @@ export function Typeform({
   signedLabel: string | null;
   ndaText: string;
   ndaSigned: boolean;
+  correctionNote?: string;
+  signedCopyName?: string;
 }) {
   const [values, setValues] = useState(initialAnswers);
   const [files, setFiles] = useState(initialFiles);
@@ -68,6 +73,7 @@ export function Typeform({
   const [email, setEmail] = useState(signerEmail);
   const [wantNda, setWantNda] = useState(false);
   const [ndaDone, setNdaDone] = useState(ndaSigned);
+  const [signedFile, setSignedFile] = useState(signedCopyName);
   const [errorId, setErrorId] = useState("");
   const [wide, setWide] = useState(false);
   const [sectionIndex, setSectionIndex] = useState(0);
@@ -273,6 +279,9 @@ export function Typeform({
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Magpie Studio</p>
               <h1 className="mt-3 text-3xl font-semibold leading-tight">Your project brief</h1>
               {title ? <p className="mt-4 text-sm font-semibold text-foreground">{title}</p> : null}
+              {correctionNote ? (
+                <p className="mx-auto mt-4 max-w-sm rounded-2xl bg-accent/10 px-4 py-3 text-sm leading-6 text-accent-strong">{correctionNote}</p>
+              ) : null}
               <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-muted">
                 Anyone with this link can answer. A phone shows one question at a time. A larger screen shows the whole section.
               </p>
@@ -410,6 +419,35 @@ export function Typeform({
               <a href={`/r/${token}/pdf`} className={`${primaryBtn} mt-8 w-full`}>
                 Download PDF
               </a>
+              <div className="mt-4 text-left">
+                {signedFile ? <p className="text-center text-sm text-muted">Signed file uploaded: {signedFile}</p> : null}
+                <label className="mt-3 flex cursor-pointer flex-col items-center rounded-2xl border border-dashed border-accent/40 bg-background px-4 py-5 text-center">
+                  <span className="text-sm font-semibold">Upload the signed PDF</span>
+                  <span className="mt-1 text-xs text-muted">Magpie confirms this copy, then sends the quotation.</span>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (!file) return;
+                      const body = new FormData();
+                      body.set("file", file);
+                      setBusy(true);
+                      void uploadSignedCopy(token, body).then((result) => {
+                        setBusy(false);
+                        if (!result.ok) setError(result.error);
+                        else {
+                          setSignedFile(result.fileName);
+                          setError("");
+                        }
+                      });
+                    }}
+                  />
+                </label>
+                {error ? <p className="mt-3 text-center text-sm font-semibold text-accent-strong">{error}</p> : null}
+              </div>
             </section>
           ) : null}
         </div>

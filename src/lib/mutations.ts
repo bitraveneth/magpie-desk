@@ -143,6 +143,9 @@ export async function createQuotation(formData: FormData) {
   if (job.briefStatus === "SENT") {
     fail(`/requirements/${job.id}`, "The client has to fill the requirement before a quotation.");
   }
+  if (!job.confirmedAt) {
+    fail(`/requirements/${job.id}`, "Confirm the signed requirement before a quotation.");
+  }
   if (job.quotation) fail(`/quotations/${job.quotation.id}`, "This requirement already has a quotation.");
 
   const template = quoteTemplates.find((item) => item.id === templateId);
@@ -164,6 +167,46 @@ export async function createQuotation(formData: FormData) {
     },
   });
   done(`/quotations/${quotation.id}`, template ? `${template.name} template added.` : "Quotation started.");
+}
+
+export async function returnForCorrection(formData: FormData) {
+  const id = text(formData, "id");
+  const note = text(formData, "note");
+  const job = await prisma.requirement.findUnique({
+    where: { id },
+    include: { quotation: true },
+  });
+  if (!job) fail("/requirements", "Requirement not found.");
+  if (job.quotation) fail(`/requirements/${id}`, "A quotation is already open, so this brief stays locked.");
+  if (job.briefStatus === "SENT") fail(`/requirements/${id}`, "The client has not submitted this brief yet.");
+  await prisma.$transaction([
+    prisma.requirementFile.deleteMany({ where: { requirementId: id, questionId: "__signed_copy" } }),
+    prisma.requirement.update({
+      where: { id },
+      data: {
+        briefStatus: "SENT",
+        status: "DRAFT",
+        confirmedAt: null,
+        signedInName: null,
+        signedInEmail: null,
+        signedInAt: null,
+        correctionNote: note || "Please review the answers and submit the brief again.",
+      },
+    }),
+  ]);
+  done(`/requirements/${id}`, "Sent back for correction. The same link is open again.");
+}
+
+export async function confirmRequirement(formData: FormData) {
+  const id = text(formData, "id");
+  const job = await prisma.requirement.findUnique({ where: { id }, include: { quotation: true } });
+  if (!job) fail("/requirements", "Requirement not found.");
+  if (job.briefStatus !== "SIGNED") {
+    fail(`/requirements/${id}`, "The client signs the requirement before you confirm it.");
+  }
+  if (job.confirmedAt) done(`/requirements/${id}`, "This requirement is already confirmed.");
+  await prisma.requirement.update({ where: { id }, data: { confirmedAt: new Date(), status: "READY" } });
+  done(`/requirements/${id}`, "Confirmed. You can send the quotation.");
 }
 
 export async function saveQuotation(formData: FormData) {

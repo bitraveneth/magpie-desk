@@ -297,6 +297,15 @@ export async function buildRequirementPdf(input: RequirementPdfInput): Promise<U
   const client = input.clientCompany || input.clientName;
   const pen = await startPdf(input.party, "Requirement", input.number, client, input.title, input.date);
   drawWrapped(pen, input.status, 10, muted, false, 10);
+  pen.y -= 4;
+  drawWrapped(pen, "Parties", 13, accent, true, 8);
+  drawWrapped(pen, "Magpie Studio", 11, ink, true, 2);
+  drawWrapped(pen, input.party.nameEn, 10, ink, false, 2);
+  drawWrapped(pen, input.party.nameZh, 10, ink, false, 8);
+  drawWrapped(pen, "Client", 11, ink, true, 2);
+  drawWrapped(pen, input.clientCompany || input.clientName || "Client", 10, ink, false, 2);
+  if (input.clientName && input.clientCompany) drawWrapped(pen, input.clientName, 10, ink, false, 8);
+  else pen.y -= 6;
   for (const section of input.sections) {
     if (section.rows.length === 0) continue;
     pen.y -= 6;

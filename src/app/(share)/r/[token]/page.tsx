@@ -31,6 +31,8 @@ export default async function SharedRequirementPage({ params }: { params: Promis
       signedLabel={job.signedInAt ? shanghaiDate(job.signedInAt) : null}
       ndaText={job.nda?.body ?? ndaBody(job)}
       ndaSigned={job.nda?.status === "SIGNED"}
+      correctionNote={job.correctionNote}
+      signedCopyName={job.files.find((file) => file.questionId === "__signed_copy")?.fileName ?? ""}
     />
   );
 }

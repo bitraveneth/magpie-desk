@@ -4,15 +4,17 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { Banner, Field, PageTitle, SampleNote } from "@/components/desk/DeskShell";
+import { Banner, Field, PageTitle, SampleNote, StatusBadge } from "@/components/desk/DeskShell";
 import { Chain } from "@/components/desk/Chain";
 import { CopyLink } from "@/components/desk/CopyLink";
 import { quoteTemplates } from "@/content/company";
-import { briefLabel } from "@/lib/brief";
-import { createQuotation, offerNda, updateRequirement } from "@/lib/mutations";
+import { deskStatus } from "@/lib/brief";
+import { createQuotation, offerNda, confirmRequirement, returnForCorrection, updateRequirement } from "@/lib/mutations";
+import { markRequirementNoticesRead } from "@/lib/notices";
 import { answeredSections } from "@/lib/requirement-document";
 import { getJob, listQuestions, origin } from "@/lib/queries";
 import { shanghaiDate } from "@/lib/money";
+import { company } from "@/content/company";
 
 export default async function RequirementDetailPage({
   params,
@@ -25,10 +27,12 @@ export default async function RequirementDetailPage({
   const messages = await searchParams;
   const job = await getJob(id);
   if (!job) notFound();
+  await markRequirementNoticesRead(id);
   const questions = await listQuestions();
   const review = answeredSections({ questions, answers: job.answers, files: job.files });
   const link = `${await origin()}/r/${job.shareToken}`;
   const filled = job.briefStatus !== "SENT";
+  const signedCopy = job.files.find((file) => file.questionId === "__signed_copy");
 
   return (
     <>
@@ -42,7 +46,7 @@ export default async function RequirementDetailPage({
         invoiceId={job.quotation?.contract?.invoice?.id}
       />
       <div className="mb-4 flex flex-wrap gap-2">
-        <Badge>{briefLabel(job.briefStatus)}</Badge>
+        <StatusBadge label={deskStatus(job)} />
         <SampleNote sample={job.sample} />
         {job.partner ? <Badge>Partner: {job.partner.name}</Badge> : <Badge>No partner</Badge>}
       </div>
@@ -78,6 +82,10 @@ export default async function RequirementDetailPage({
           </Card>
           <Card>
             <h2 className="text-lg font-semibold">Requirement PDF</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Both parties are named on the PDF: {company.publicName} ({company.nameEn}) and {job.clientCompany || job.clientName}
+              {job.clientCompany && job.clientName ? ` · ${job.clientName}` : ""}.
+            </p>
             <p className="mt-2 text-sm text-muted">
               {job.briefStatus === "SIGNED" && job.signedInAt
                 ? `Signed by ${job.signedInName} on ${shanghaiDate(job.signedInAt)}.`
@@ -85,12 +93,36 @@ export default async function RequirementDetailPage({
                   ? "The client has submitted the questionnaire."
                   : "The PDF fills in as the client answers. It picks up the signature after they sign."}
             </p>
-            <div className="mt-4">
-              <Button href={`/requirements/${job.id}/pdf`} variant="outline">
-                Download PDF
-              </Button>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button href={`/requirements/${job.id}/pdf`} variant="outline">Download PDF</Button>
+              {signedCopy ? <Button href={`/requirements/${job.id}/signed`} variant="ghost">Signed upload</Button> : null}
             </div>
           </Card>
+          {job.quotation ? null : job.briefStatus === "FILLED" || job.briefStatus === "SIGNED" ? (
+            <Card>
+              <h2 className="text-lg font-semibold">Send back for correction</h2>
+              <p className="mt-2 text-sm text-muted">The same link opens again. The client can change the answers, then sign and upload the PDF once more.</p>
+              <form action={returnForCorrection} className="mt-4 grid gap-3">
+                <input type="hidden" name="id" value={job.id} />
+                <Field label="Note for the client">
+                  <Textarea name="note" rows={3} defaultValue={job.correctionNote} placeholder="What should they correct?" />
+                </Field>
+                <Button type="submit" variant="outline">Resend for correction</Button>
+              </form>
+            </Card>
+          ) : null}
+          {job.briefStatus === "SIGNED" && !job.confirmedAt ? (
+            <Card>
+              <h2 className="text-lg font-semibold">Confirm</h2>
+              <p className="mt-2 text-sm text-muted">
+                {signedCopy ? `${signedCopy.fileName} is uploaded.` : "The client has signed. They can also upload the signed PDF from the link."} Confirm it before the quotation.
+              </p>
+              <form action={confirmRequirement} className="mt-4">
+                <input type="hidden" name="id" value={job.id} />
+                <Button type="submit">Confirm requirement</Button>
+              </form>
+            </Card>
+          ) : null}
           <Card>
             <h2 className="text-lg font-semibold">Sign-in and NDA</h2>
             <p className="mt-2 text-sm text-muted">
@@ -124,7 +156,7 @@ export default async function RequirementDetailPage({
           <div className="mt-4">
             <Button href={`/quotations/${job.quotation.id}`}>Open {job.quotation.number}</Button>
           </div>
-        ) : filled ? (
+        ) : job.confirmedAt ? (
           <div className="mt-4 flex flex-wrap gap-3">
             <form action={createQuotation}>
               <input type="hidden" name="requirementId" value={job.id} />
@@ -143,7 +175,11 @@ export default async function RequirementDetailPage({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-muted">The client fills the questionnaire on the requirement link. A quotation opens after they submit.</p>
+          <p className="mt-3 text-sm text-muted">
+            {filled
+              ? "The client still needs to sign. After you confirm the signed brief, the quotation opens."
+              : "The client fills the questionnaire on the requirement link. A quotation opens after they sign and you confirm it."}
+          </p>
         )}
       </Card>
       <Card className="mt-6">

@@ -51,6 +51,11 @@ export function briefLabel(status: string): string {
   return "Sent";
 }
 
+export function deskStatus(job: { briefStatus: string; confirmedAt?: Date | null }): string {
+  if (job.confirmedAt) return "Confirmed";
+  return briefLabel(job.briefStatus);
+}
+
 export function answerMap(answers: { questionId: string; value: string }[]): Map<string, string> {
   return new Map(answers.map((answer) => [answer.questionId, answer.value]));
 }

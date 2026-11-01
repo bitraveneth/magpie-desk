@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { notifyRequirement } from "@/lib/notices";
 import { prisma } from "@/lib/db";
 import { ndaBody } from "@/lib/nda-text";
 import { contractCompanyName, getCompany, invalidateQuestionCache, listQuestions, takeDocumentNumber } from "@/lib/queries";
@@ -148,8 +149,9 @@ export async function saveBriefSection(formData: FormData) {
     if (problem) redirectBrief(token, { section: problem.section, error: problem.message });
     await prisma.requirement.update({
       where: { id: job.id },
-      data: { ...columnUpdates(merged, job), briefStatus: "FILLED", status: "READY" },
+      data: { ...columnUpdates(merged, job), briefStatus: "FILLED", status: "READY", correctionNote: "" },
     });
+    await notifyRequirement(job.id, "FILLED", `${job.title} was filled in and is ready to review.`);
     redirectBrief(token, { notice: "Requirement submitted. Download the PDF, then sign it." });
   }
 
@@ -212,8 +214,10 @@ export async function signRequirement(formData: FormData) {
       signedInAt: new Date(),
       briefStatus: "SIGNED",
       status: "READY",
+      correctionNote: "",
     },
   });
+  await notifyRequirement(job.id, "SIGNED", `${job.title} was signed by ${name}. Confirm it before the quotation.`);
 
   const wantsNda = text(formData, "signNda") === "yes";
   if (!wantsNda) redirectBrief(token, { notice: "Requirement signed." });
@@ -349,8 +353,9 @@ export async function submitBrief(token: string, patch: Record<string, string>) 
   if (problem) return { ok: false as const, error: problem.message, questionId: problem.questionId };
   await prisma.requirement.update({
     where: { id: job.id },
-    data: { ...columnUpdates(merged, job), briefStatus: "FILLED", status: "READY" },
+    data: { ...columnUpdates(merged, job), briefStatus: "FILLED", status: "READY", correctionNote: "" },
   });
+  await notifyRequirement(job.id, "FILLED", `${job.title} was filled in and is ready to review.`);
   revalidatePath("/", "layout");
   return { ok: true as const };
 }
@@ -388,8 +393,10 @@ export async function signBrief(token: string, name: string, email: string, sign
       signedInAt: signedAt,
       briefStatus: "SIGNED",
       status: "READY",
+      correctionNote: "",
     },
   });
+  await notifyRequirement(job.id, "SIGNED", `${job.title} was signed by ${signer}. Confirm it before the quotation.`);
   let ndaSigned = job.nda?.status === "SIGNED";
   if (signNda && !ndaSigned) {
     const profile = await getCompany();
@@ -462,4 +469,34 @@ export async function removeBriefFile(token: string, fileId: string) {
   }
   await prisma.requirementFile.deleteMany({ where: { id: fileId, requirementId: job.id } });
   return { ok: true as const };
+}
+
+export async function uploadSignedCopy(token: string, formData: FormData) {
+  const job = await openBrief(token);
+  if (!job) return { ok: false as const, error: "This link is not active." };
+  if (job.briefStatus === "SENT" || job.quotation) {
+    return { ok: false as const, error: "Sign the requirement before uploading the signed copy." };
+  }
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size <= 0) return { ok: false as const, error: "Choose the signed PDF." };
+  if (file.size > 8 * 1024 * 1024) return { ok: false as const, error: "The signed PDF must be 8 MB or smaller." };
+  const mime = fileMime(file.name, file.type);
+  if (mime !== "application/pdf") return { ok: false as const, error: "Upload the signed copy as a PDF." };
+  const data = await file.arrayBuffer();
+  const copy = new ArrayBuffer(data.byteLength);
+  new Uint8Array(copy).set(new Uint8Array(data));
+  const fileName = cleanFileName(file.name);
+  await prisma.requirementFile.deleteMany({ where: { requirementId: job.id, questionId: "__signed_copy" } });
+  await prisma.requirementFile.create({
+    data: {
+      requirementId: job.id,
+      questionId: "__signed_copy",
+      fileName,
+      mime,
+      bytes: new Uint8Array(copy),
+    },
+  });
+  await notifyRequirement(job.id, "UPLOAD", `${job.title} has a signed PDF upload: ${fileName}.`);
+  revalidatePath("/", "layout");
+  return { ok: true as const, fileName };
 }

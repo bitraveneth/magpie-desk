@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { company } from "@/content/company";
 import { questionBank } from "@/content/questions";
+import { ensurePipelineSamples } from "@/lib/sample-pipeline";
 import { prisma } from "@/lib/db";
 import { formatDocumentNumber, shortNumber, uniqueCode } from "@/lib/contract-number";
 import { ndaBody } from "@/lib/nda-text";
@@ -115,6 +116,7 @@ async function loadDesk() {
 
   await ensureQuestions();
   await refreshUntouchedQuestions();
+  await ensurePipelineSamples();
 }
 
 const retiredChoices: Record<string, { kind: string; options: string[] }> = {

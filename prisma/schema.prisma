@@ -104,13 +104,28 @@ model Requirement {
   signedInName  String?
   signedInEmail String?
   signedInAt    DateTime?
-  briefStatus   BriefStatus       @default(SENT)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  quotation     Quotation?
-  nda           Nda?
-  answers       RequirementAnswer[]
-  files         RequirementFile[]
+  briefStatus    BriefStatus       @default(SENT)
+  correctionNote String            @default("")
+  confirmedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  quotation      Quotation?
+  nda            Nda?
+  answers        RequirementAnswer[]
+  files          RequirementFile[]
+  notices        DeskNotice[]
+}
+
+model DeskNotice {
+  id            String      @id @default(cuid())
+  requirementId String
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  kind          String
+  message       String
+  createdAt     DateTime    @default(now())
+  readAt        DateTime?
+
+  @@index([readAt])
 }
 
 model RequirementQuestion {
