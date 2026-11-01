@@ -1,0 +1,223 @@
+import { headers } from "next/headers";
+import { company } from "@/content/company";
+import { prisma } from "@/lib/db";
+import { formatDocumentNumber, shortNumber, uniqueCode } from "@/lib/contract-number";
+import { ndaBody } from "@/lib/nda-text";
+
+const jobInclude = {
+  partner: true,
+  nda: true,
+  quotation: {
+    include: {
+      lines: { orderBy: { sort: "asc" as const } },
+      contract: {
+        include: {
+          invoice: { include: { lines: { orderBy: { sort: "asc" as const } } } },
+        },
+      },
+    },
+  },
+} as const;
+
+export type DeskJob = NonNullable<Awaited<ReturnType<typeof getJob>>>;
+
+export async function origin(): Promise<string> {
+  const headerList = await headers();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
+  const proto = headerList.get("x-forwarded-proto") ?? "http";
+  return `${proto}://${host}`;
+}
+
+export async function ensureDesk() {
+  await prisma.companyProfile.upsert({
+    where: { id: "company" },
+    update: {},
+    create: {
+      id: "company",
+      publicName: company.publicName,
+      nameEn: company.nameEn,
+      nameZh: company.nameZh,
+      email: company.email,
+      address: company.address,
+    },
+  });
+
+  await prisma.paymentSettings.upsert({
+    where: { id: "payments" },
+    update: {},
+    create: { id: "payments" },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(8421101)`;
+    const current = await tx.companyProfile.findUniqueOrThrow({ where: { id: "company" } });
+    if (current.seeded) return;
+
+    await tx.partner.upsert({
+      where: { code: "sample-partner" },
+      update: {},
+      create: { name: "Sample Partner", code: "sample-partner", sample: true },
+    });
+
+    const sampleRequirement = await tx.requirement.findFirst({ where: { sample: true } });
+    if (!sampleRequirement) {
+      const when = new Date();
+      await tx.requirement.create({
+        data: {
+          number: shortNumber("REQ", when, uniqueCode()),
+          shareToken: uniqueCode(12).toLowerCase(),
+          clientName: "Sample Client",
+          clientEmail: "client@example.com",
+          clientCompany: "Sample Studio",
+          title: "Sample: Business website",
+          summary: "Sample data. A business website brief so the desk is not empty.",
+          sample: true,
+        },
+      });
+    }
+
+    await tx.companyProfile.update({
+      where: { id: "company" },
+      data: { seeded: true },
+    });
+  });
+}
+
+export async function getCompany() {
+  await ensureDesk();
+  const profile = await prisma.companyProfile.findUniqueOrThrow({ where: { id: "company" } });
+  return profile;
+}
+
+export async function getPayments() {
+  await ensureDesk();
+  return prisma.paymentSettings.findUniqueOrThrow({ where: { id: "payments" } });
+}
+
+export async function getJob(id: string) {
+  await ensureDesk();
+  return prisma.requirement.findUnique({ where: { id }, include: jobInclude });
+}
+
+export async function getJobByToken(shareToken: string) {
+  await ensureDesk();
+  return prisma.requirement.findUnique({ where: { shareToken }, include: jobInclude });
+}
+
+export async function getJobByQuotation(id: string) {
+  await ensureDesk();
+  const quotation = await prisma.quotation.findUnique({
+    where: { id },
+    select: { requirementId: true },
+  });
+  if (!quotation) return null;
+  return getJob(quotation.requirementId);
+}
+
+export async function getJobByContract(id: string) {
+  await ensureDesk();
+  const contract = await prisma.contract.findUnique({
+    where: { id },
+    select: { quotation: { select: { requirementId: true } } },
+  });
+  if (!contract) return null;
+  return getJob(contract.quotation.requirementId);
+}
+
+export async function getJobByInvoice(id: string) {
+  await ensureDesk();
+  const invoice = await prisma.invoice.findUnique({
+    where: { id },
+    select: { contract: { select: { quotation: { select: { requirementId: true } } } } },
+  });
+  if (!invoice) return null;
+  return getJob(invoice.contract.quotation.requirementId);
+}
+
+export async function listRequirements() {
+  await ensureDesk();
+  return prisma.requirement.findMany({
+    orderBy: { updatedAt: "desc" },
+    include: {
+      partner: true,
+      nda: true,
+      quotation: { include: { contract: { include: { invoice: true } } } },
+    },
+  });
+}
+
+export async function listPartners() {
+  await ensureDesk();
+  return prisma.partner.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      requirements: {
+        include: {
+          quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+        },
+      },
+    },
+  });
+}
+
+export async function getPartner(id: string) {
+  await ensureDesk();
+  return prisma.partner.findUnique({
+    where: { id },
+    include: {
+      requirements: {
+        orderBy: { updatedAt: "desc" },
+        include: {
+          quotation: { include: { contract: { include: { invoice: { include: { lines: true } } } } } },
+        },
+      },
+    },
+  });
+}
+
+export async function getPartnerByCode(code: string) {
+  await ensureDesk();
+  return prisma.partner.findUnique({ where: { code } });
+}
+
+export function contractCompanyName(clientCompany: string, publicName: string): string {
+  return clientCompany.trim() || publicName;
+}
+
+export async function takeDocumentNumber(companyName: string, kind?: "NDA") {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const number = formatDocumentNumber(companyName, new Date(), uniqueCode(), kind);
+    const existing = kind === "NDA"
+      ? await prisma.nda.findUnique({ where: { number } })
+      : await prisma.contract.findUnique({ where: { number } });
+    if (!existing) return number;
+  }
+  throw new Error("Could not generate a unique document number");
+}
+
+export async function takeShortNumber(prefix: "REQ" | "QUO" | "INV") {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const number = shortNumber(prefix, new Date(), uniqueCode());
+    const existing =
+      prefix === "REQ"
+        ? await prisma.requirement.findUnique({ where: { number } })
+        : prefix === "QUO"
+          ? await prisma.quotation.findUnique({ where: { number } })
+          : await prisma.invoice.findUnique({ where: { number } });
+    if (!existing) return number;
+  }
+  throw new Error("Could not generate a unique number");
+}
+
+export async function takeShareToken() {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const shareToken = uniqueCode(12).toLowerCase();
+    const existing = await prisma.requirement.findUnique({ where: { shareToken } });
+    if (!existing) return shareToken;
+  }
+  throw new Error("Could not generate a requirement link");
+}
+
+export function freshNdaBody(job: { clientName: string; clientCompany: string; title: string }) {
+  return ndaBody(job);
+}

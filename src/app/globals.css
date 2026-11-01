@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f2ea;
+  --foreground: #0f0f0f;
+  --accent: #5c2d91;
+  --accent-strong: #4a2476;
+  --muted: #6b6560;
+  --card: #ffffff;
+  --border: #e5dfd4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --font-sans: var(--font-urbanist);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-urbanist), system-ui, sans-serif;
+}
+
+.desk-card {
+  border-radius: 1.5rem;
+  border: 1px solid color-mix(in srgb, #ffffff 58%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #ffffff 92%, var(--background)),
+    color-mix(in srgb, var(--background) 55%, #ffffff)
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 80%, transparent),
+    0 12px 30px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.display {
+  font-family: var(--font-hero-title), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.legal-zh {
+  font-family: var(--font-noto-sc), "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+}
