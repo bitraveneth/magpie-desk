@@ -28,7 +28,9 @@ export default async function PaymentsPage({
                 {account.isDefault ? <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium">On invoices</span> : null}
               </div>
               <h2 className="legal-zh mt-2 text-2xl font-semibold">{payments.companyName}</h2>
-              <p className="legal-zh mt-1 text-sm text-white/80">{account.accountName}</p>
+              {account.accountName && account.accountName !== payments.companyName ? (
+                <p className="legal-zh mt-1 text-sm text-white/80">{account.accountName}</p>
+              ) : null}
             </header>
             <dl className="grid gap-4 px-6 py-5 sm:grid-cols-2">
               <div>
